@@ -1,5 +1,5 @@
-# ModTemplate
-Template for new mods
+# SokuStreaming
+Adds an overlay to Touhou 12.3, reflecting the current game state.
 
 # Build
 Requires CMake, git and the VisualStudio compiler (MSVC).
@@ -18,8 +18,8 @@ drop the folder onto the console.
 
 Now let's download the repository and initialize it for the first time
 ```
-git clone https://github.com/SokuDev/ModTemplate
-cd ModTemplate
+git clone https://github.com/SokuDev/SokuStreaming
+cd SokuStreaming
 git submodule init
 git submodule update
 mkdir build
@@ -30,7 +30,7 @@ Note that if you want to build in Release, you should replace `-DCMAKE_BUILD_TYP
 
 ## Compiling
 Now, to build the mod, go to the build directory (if you did the previous step you already are)
-`cd C:\Users\PinkySmile\SokuProjects\ModTemplate\build` and invoke the compiler by running `cmake --build . --target ModTemplate`. If you change the name of the mod (in the add_library statement in CMakeLists.txt), you will need to replace 'ModTemplate' by the name of your mod in the previous command.
+`cd C:\Users\PinkySmile\SokuProjects\SokuStreaming\build` and invoke the compiler by running `cmake --build . --target SokuStreaming`. If you change the name of the mod (in the add_library statement in CMakeLists.txt), you will need to replace 'SokuStreaming' by the name of your mod in the previous command.
 
-You should find the resulting ModTemplate.dll mod inside the build folder that can be to SWRSToys.ini.
-In my case, I would add this line to it `ModTemplate=C:/Users/PinkySmile/SokuProjects/ModTemplate/build/ModTemplate.dll`.
+You should find the resulting SokuStreaming.dll mod inside the build folder that can be to SWRSToys.ini.
+In my case, I would add this line to it `SokuStreaming=C:/Users/PinkySmile/SokuProjects/SokuStreaming/build/SokuStreaming.dll`.

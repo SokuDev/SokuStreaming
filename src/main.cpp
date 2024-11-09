@@ -1,113 +1,213 @@
 //
-// Created by PinkySmile on 31/10/2020
+// Created by Gegel85 on 04/12/2020
 //
 
+#include <algorithm>
 #include <SokuLib.hpp>
+#include <windows.h>
+#include <Shlwapi.h>
+#include <dinput.h>
+#include "Utils/InputBox.hpp"
+#include "Exceptions.hpp"
+#include "Network/Handlers.hpp"
+#include "State.hpp"
+#include "DeprecatedElements.hpp"
 
-static bool init = false;
-static int (SokuLib::BattleManager::*ogBattleMgrOnProcess)();
-static void (SokuLib::BattleManager::*ogBattleMgrOnRender)();
-static SokuLib::DrawUtils::Sprite text;
-static SokuLib::SWRFont font;
+int __fastcall CTitle_OnProcess(Title *This) {
+	// super
+	int ret = (This->*s_origCTitle_Process)();
 
-int __fastcall CBattleManager_OnRender(SokuLib::BattleManager *This)
-{
-	(This->*ogBattleMgrOnRender)();
-	text.draw();
-	return 0;
+	needReset = true;
+	needRefresh = true;
+	checkKeyInputs();
+	return ret;
 }
 
-void loadFont()
-{
-	SokuLib::FontDescription desc;
+int __fastcall CBattleWatch_OnProcess(BattleWatch *This) {
+	// super
+	int ret = (This->*s_origCBattleWatch_Process)();
 
-	// Pink
-	desc.r1 = 255;
-	desc.g1 = 155;
-	desc.b1 = 155;
-	// Light green
-	desc.r2 = 155;
-	desc.g2 = 255;
-	desc.b2 = 155;
-	desc.height = 24;
-	desc.weight = FW_BOLD;
-	desc.italic = 0;
-	desc.shadow = 4;
-	desc.bufferSize = 1000000;
-	desc.charSpaceX = 0;
-	desc.charSpaceY = 0;
-	desc.offsetX = 0;
-	desc.offsetY = 0;
-	desc.useOffset = 0;
-	strcpy(desc.faceName, "MonoSpatialModSWR");
-	font.create();
-	font.setIndirect(desc);
+	updateCache(true);
+	return ret;
 }
 
-int __fastcall CBattleManager_OnProcess(SokuLib::BattleManager *This)
-{
-	if (!init) {
-		SokuLib::Vector2i realSize;
+int __fastcall CBattle_OnProcess(Battle *This) {
+	// super
+	int ret = (This->*s_origCBattle_Process)();
 
-		loadFont();
-		text.texture.createFromText("Hello, world!", font, {300, 300}, &realSize);
-		text.setPosition(SokuLib::Vector2i{320 - realSize.x / 2, 240 - realSize.y / 2});
-		text.setSize(realSize.to<unsigned>());
-		text.rect.width = realSize.x;
-		text.rect.height = realSize.y;
-		init = true;
-	}
-	text.setRotation(text.getRotation() + 0.01f);
-	return (This->*ogBattleMgrOnProcess)();
+	if (SokuLib::mainMode == SokuLib::BATTLE_MODE_VSPLAYER)
+		updateCache(false);
+	return ret;
 }
 
-// We check if the game version is what we target (in our case, Soku 1.10a).
-extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16])
+void loadCommon()
 {
-	return memcmp(hash, SokuLib::targetHash, sizeof(SokuLib::targetHash)) == 0;
+	needRefresh = true;
+	checkKeyInputs();
 }
 
-// Called when the mod loader is ready to initialize this module.
-// All hooks should be placed here. It's also a good moment to load settings from the ini.
-extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hParentModule)
+int __fastcall CLoading_OnProcess(Loading *This) {
+	// super
+	int ret = (This->*s_origCLoading_Process)();
+
+	loadCommon();
+	return ret;
+}
+
+int __fastcall CLoadingWatch_OnProcess(LoadingWatch *This) {
+	// super
+	int ret = (This->*s_origCLoadingWatch_Process)();
+
+	loadCommon();
+	return ret;
+}
+
+int __fastcall CBattleManager_KO(SokuLib::BattleManager *This) {
+	// super
+	int ret = (This->*s_origCBattleManager_KO)();
+
+	onKO();
+	return ret;
+}
+
+int __fastcall CBattleManager_Start(SokuLib::BattleManager *This) {
+	// super
+	int ret = (This->*s_origCBattleManager_Start)();
+
+	onRoundStart();
+	return ret;
+}
+
+int __fastcall CBattleManager_Render(SokuLib::BattleManager *This) {
+	// super
+	int ret = (This->*s_origCBattleManager_Render)();
+
+	checkKeyInputs();
+	return ret;
+}
+
+// �ݒ胍�[�h
+void LoadSettings(LPCSTR profilePath, LPCSTR parentPath)
+{
+	// �����V���b�g�_�E��
+	enabled = GetPrivateProfileInt("SokuStreaming", "Enabled", 1, profilePath) != 0;
+	if (!enabled)
+		return;
+
+	/*FILE *_;
+
+	AllocConsole();
+	freopen_s(&_, "CONOUT$", "w", stdout);*/
+	port = GetPrivateProfileInt("Server", "Port", 80, profilePath);
+	keys[KEY_DECREASE_L_SCORE] = GetPrivateProfileInt("Keys", "DecreaseLeftScore",  '1', profilePath);
+	keys[KEY_INCREASE_L_SCORE] = GetPrivateProfileInt("Keys", "IncreaseLeftScore",  '2', profilePath);
+	keys[KEY_CHANGE_L_NAME]    = GetPrivateProfileInt("Keys", "ChangeLeftName",     '3', profilePath);
+	keys[KEY_RESET_SCORES]     = GetPrivateProfileInt("Keys", "ResetScores",        '5', profilePath);
+	keys[KEY_RESET_STATE]      = GetPrivateProfileInt("Keys", "ResetState",         '6', profilePath);
+	keys[KEY_DECREASE_R_SCORE] = GetPrivateProfileInt("Keys", "DecreaseRightScore", '8', profilePath);
+	keys[KEY_INCREASE_R_SCORE] = GetPrivateProfileInt("Keys", "IncreaseRightScore", '9', profilePath);
+	keys[KEY_CHANGE_R_NAME]    = GetPrivateProfileInt("Keys", "ChangeRightName",    '0', profilePath);
+
+	webServer = std::make_unique<WebServer>();
+	webServer->addRoute("/", root);
+	webServer->addRoute("/state", state);
+	Socket::HttpResponse connect(const Socket::HttpRequest &requ);
+	webServer->addRoute("/connect", connect);
+	webServer->addStaticFolder("/static", std::string(parentPath) + "/static");
+	webServer->start(port);
+	webServer->onWebSocketConnect(onNewWebSocket);
+}
+
+void hookFunctions()
 {
 	DWORD old;
 
-#ifdef _DEBUG
-	FILE *_;
+	::VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, PAGE_EXECUTE_WRITECOPY, &old);
+	s_origCTitle_Process = SokuLib::union_cast<int (Title::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CTitle + SokuLib::OFFSET_ON_PROCESS,
+			reinterpret_cast<DWORD>(CTitle_OnProcess)
+		)
+	);
+	s_origCBattleWatch_Process = SokuLib::union_cast<int (BattleWatch::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CBattleWatch + SokuLib::OFFSET_ON_PROCESS,
+			reinterpret_cast<DWORD>(CBattleWatch_OnProcess)
+		)
+	);
+	s_origCLoadingWatch_Process = SokuLib::union_cast<int (LoadingWatch::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CLoadingWatch + SokuLib::OFFSET_ON_PROCESS,
+			reinterpret_cast<DWORD>(CLoadingWatch_OnProcess)
+		)
+	);
+	s_origCBattle_Process = SokuLib::union_cast<int (Battle::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CBattle + SokuLib::OFFSET_ON_PROCESS,
+			reinterpret_cast<DWORD>(CBattle_OnProcess)
+		)
+	);
+	s_origCLoading_Process = SokuLib::union_cast<int (Loading::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CLoading + SokuLib::OFFSET_ON_PROCESS,
+			reinterpret_cast<DWORD>(CLoading_OnProcess)
+		)
+	);
+	s_origCBattleManager_Start = SokuLib::union_cast<int (SokuLib::BattleManager::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CBattleManager + SokuLib::BATTLE_MGR_OFFSET_ON_SAY_START,
+			reinterpret_cast<DWORD>(CBattleManager_Start)
+		)
+	);
+	s_origCBattleManager_KO = SokuLib::union_cast<int (SokuLib::BattleManager::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CBattleManager + SokuLib::BATTLE_MGR_OFFSET_ON_KO,
+			reinterpret_cast<DWORD>(CBattleManager_KO)
+		)
+	);
+	/*s_origCBattleManager_Render = SokuLib::union_cast<int (SokuLib::BattleManager::*)()>(
+		SokuLib::TamperDword(
+			SokuLib::vtbl_CBattleManager + SokuLib::BATTLE_MGR_OFFSET_ON_RENDER,
+			reinterpret_cast<DWORD>(CBattleManager_Render)
+		)
+	);*/
+	::VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, old, &old);
+	::FlushInstructionCache(GetCurrentProcess(), NULL, 0);
+}
 
-	AllocConsole();
-	freopen_s(&_, "CONOUT$", "w", stdout);
-	freopen_s(&_, "CONOUT$", "w", stderr);
-#endif
-
-	puts("Hello, world!");
-	VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, PAGE_EXECUTE_WRITECOPY, &old);
-	ogBattleMgrOnRender  = SokuLib::TamperDword(&SokuLib::VTable_BattleManager.onRender,  CBattleManager_OnRender);
-	ogBattleMgrOnProcess = SokuLib::TamperDword(&SokuLib::VTable_BattleManager.onProcess, CBattleManager_OnProcess);
-	VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, old, &old);
-
-	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
+extern "C"
+__declspec(dllexport) bool CheckVersion(const BYTE hash[16])
+{
 	return true;
 }
 
-extern "C" int APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
+extern "C"
+__declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hParentModule)
+{
+	try {
+		char profilePath[1024 + MAX_PATH];
+		char profileParent[1024 + MAX_PATH];
+
+		GetModuleFileName(hMyModule, profilePath, 1024);
+		PathRemoveFileSpec(profilePath);
+		strcpy(profileParent, profilePath);
+		PathAppend(profilePath, "SokuStreaming.ini");
+		LoadSettings(profilePath, profileParent);
+
+		if (!enabled)
+			return true;
+		hookFunctions();
+	} catch (std::exception &e) {
+		MessageBoxA(nullptr, e.what(), "Cannot init SokuStreaming", MB_OK | MB_ICONERROR);
+	} catch (...) {
+		MessageBoxA(nullptr, "Wtf ?", "Huh... ok", MB_OK | MB_ICONERROR);
+		abort();
+	}
+	return true;
+}
+
+extern "C"
+int APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 {
 	return TRUE;
 }
-
-// New mod loader functions
-// Loading priority. Mods are loaded in order by ascending level of priority (the highest first).
-// When 2 mods define the same loading priority the loading order is undefined.
-extern "C" __declspec(dllexport) int getPriority()
-{
-	return 0;
-}
-
-// Not yet implemented in the mod loader, subject to change
-// SokuModLoader::IValue **getConfig();
-// void freeConfig(SokuModLoader::IValue **v);
-// bool commitConfig(SokuModLoader::IValue *);
-// const char *getFailureReason();
-// bool hasChainedHooks();
-// void unHook();
