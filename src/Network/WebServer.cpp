@@ -146,7 +146,6 @@ void WebServer::_serverLoop()
 	Socket newConnection = this->_sock.accept();
 	Socket::HttpResponse response;
 	Socket::HttpRequest requ;
-	std::string s;
 
 #ifdef _DEBUG
 	std::cerr << "New connection from " << inet_ntoa(newConnection.getRemote().sin_addr) << ":" << newConnection.getRemote().sin_port << std::endl;
@@ -154,8 +153,7 @@ void WebServer::_serverLoop()
 	try {
 		try {
 			requ.ip = newConnection.getRemote().sin_addr.s_addr;
-			s = newConnection.readUntilEOF();
-			requ = Socket::parseHttpRequest(s);
+			requ = newConnection.readHttpRequest();
 			requ.ip = newConnection.getRemote().sin_addr.s_addr;
 			if (requ.httpVer != "HTTP/1.1")
 				throw AbortConnectionException(505);
@@ -170,7 +168,10 @@ void WebServer::_serverLoop()
 				else
 					response = this->_checkFolders(requ);
 			}
-		} catch (InvalidHTTPAnswerException &) {
+		} catch (InvalidHTTPAnswerException &e) {
+		#ifdef _DEBUG
+			std::cout << e.what() << std::endl;
+		#endif
 			response = WebServer::_makeGenericPage(400);
 		} catch (NotImplementedException &) {
 			response = WebServer::_makeGenericPage(501);
@@ -178,19 +179,19 @@ void WebServer::_serverLoop()
 			response = WebServer::_makeGenericPage(e.getCode());
 		}
 		response.codeName = WebServer::codes.at(response.returnCode);
+		response.header["Connection"] = "Close";
 	} catch (std::exception &e) {
 		std::cerr << e.what() << std::endl;
 		response = WebServer::_makeGenericPage(500, e.what());
 	}
 	response.httpVer = "HTTP/1.1";
-	response.header["content-length"] = std::to_string(response.body.length());
 #ifdef _DEBUG
 	std::cout << inet_ntoa(newConnection.getRemote().sin_addr) << ":" << newConnection.getRemote().sin_port << " ";
 	if (!requ.httpVer.empty())
 		std::cout << requ.path;
 	else {
 		std::cout << "<Malformed HTTP request>";
-		std::cerr << "Parsing error of request \"" << s << "\"" << std::endl;
+		std::cerr << "Parsing error of request" << std::endl;
 	}
 	std::cout << ": " << response.returnCode << std::endl;
 #endif
@@ -206,15 +207,16 @@ Socket::HttpResponse WebServer::_makeGenericPage(unsigned short code)
 
 	response.returnCode = code;
 	response.codeName = WebServer::codes.at(response.returnCode);
-	response.header["content-type"] = "text/html";
+	response.header["Content-Type"] = "text/html";
 	response.body = "<html>"
 		"<head>"
 			"<title>" + response.codeName + "</title>"
 		"</head>"
-		"<body>"
+		"<body style=\"text-align: center\">"
 			"<h1>" +
 				std::to_string(response.returnCode) + ": " + response.codeName +
 			"</h1>"
+			"<hr>"
 		"</body>"
 	"</html>";
 	return response;
@@ -226,15 +228,16 @@ Socket::HttpResponse WebServer::_makeGenericPage(unsigned short code, const std:
 
 	response.returnCode = code;
 	response.codeName = WebServer::codes.at(response.returnCode);
-	response.header["content-type"] = "text/html";
+	response.header["Content-Type"] = "text/html";
 	response.body = "<html>"
 		"<head>"
 			"<title>" + response.codeName + "</title>"
 		"</head>"
-		"<body>"
+		"<body style=\"text-align: center\">"
 			"<h1>" +
 				std::to_string(response.returnCode) + ": " + response.codeName + " (" + extra + ")"
 			"</h1>"
+			"<hr>"
 		"</body>"
 	"</html>";
 	return response;
@@ -261,7 +264,8 @@ Socket::HttpResponse WebServer::_checkFolders(const Socket::HttpRequest &request
 			if (stream.fail())
 				throw AbortConnectionException(404);
 			response.returnCode = 200;
-			response.header["content-byte"] = type;
+			response.header["Cache-Control"] = "private, immutable, max-age=3600";
+			response.header["Content-Type"] = type;
 			response.body = {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
 			return response;
 		}

@@ -48,7 +48,7 @@ void WebSocket::_establishHandshake(const std::string &host)
 		{"Connection",             "Upgrade"},
 	};
 	this->sendHttpRequest(request);
-	response = this->parseHttpResponse(this->getRawAnswer());
+	response = this->readHttpResponse();
 	if (response.returnCode != 101) {
 		this->disconnect();
 		throw InvalidHandshakeException("WebSocket Handshake failed: Server answered with code " + std::to_string(response.returnCode) + " but 101 was expected");
@@ -184,11 +184,6 @@ void WebSocket::disconnect()
 	}
 }
 
-std::string WebSocket::getRawAnswer()
-{
-	return Socket::readUntilEOF();
-}
-
 void WebSocket::sendHttpRequest(const Socket::HttpRequest &request)
 {
 	std::string requestString = generateHttpRequest(request);
@@ -219,14 +214,14 @@ Socket::HttpResponse WebSocket::solveHandshake(const Socket::HttpRequest &reques
 
 	if (request.method != "GET")
 		throw AbortConnectionException(405);
-	if (requ.header["Upgrade"] != "websocket")
+	if (requ.header["upgrade"] != "websocket")
 		throw AbortConnectionException(400);
-	if (requ.header["Connection"].find("Upgrade") == std::string::npos)
+	if (requ.header["connection"].find("Upgrade") == std::string::npos)
 		throw AbortConnectionException(400);
 	response.returnCode = 101;
 	response.header["Upgrade"] = "websocket";
 	response.header["Connection"] = "Upgrade";
-	response.header["Sec-WebSocket-Accept"] = _solveHandshakeToken(requ.header["Sec-WebSocket-Key"]);
+	response.header["Sec-WebSocket-Accept"] = _solveHandshakeToken(requ.header["sec-websocket-key"]);
 	return response;
 }
 

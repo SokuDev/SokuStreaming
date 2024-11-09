@@ -15,6 +15,7 @@
 #endif
 #include <string>
 #include <map>
+#include <mutex>
 
 //! @brief Define a Socket
 class Socket {
@@ -25,7 +26,7 @@ public:
 		std::string body; //!< The body of the request
 		std::string method; //!< The method of the request (put, get, etc.)
 		std::string host; //!< The host to contact
-		unsigned ip;
+		unsigned ip = 0;
 		int portno; //!< The port number to contact the host
 		std::map<std::string, std::string> header; //!< The header of the request (entry: value)
 		std::string path; //!< The url to fetch
@@ -73,14 +74,9 @@ public:
 	//! @param msg The message to send.
 	virtual void send(const std::string &msg);
 
-	//! @brief Read the Socket buffer.
-	//! @param size How much must be read.
-	//! @return std::string
-	virtual std::string read(int size);
-
-	//! @brief Read the Socket buffer until it is empty.
-	//! @return std::string
-	virtual std::string readUntilEOF();
+	std::string read(int size);
+	std::string readExactly(int size);
+	std::string getline(const char *delim = "\n");
 
 	//! @brief Generate a http payload from a HttpRequest
 	//! @param request The request to generate
@@ -97,22 +93,13 @@ public:
 	//! @return HttpResponse
 	HttpResponse makeHttpRequest(const HttpRequest &request);
 
-	//! @brief Create a basic http request from scratch.
-	//! @param host Host to connect to.
-	//! @param portno Port number used to connect to the host.
-	//! @param content The content of the request.
-	//! @return std::string
-	std::string makeRawRequest(const std::string &host, unsigned short portno, const std::string &content);
-
-	//! @brief Parse the response.
-	//! @param respon The string to parse
+	//! @brief Read an http response.
 	//! @return HttpResponse
-	static HttpResponse parseHttpResponse(const std::string &respon);
+	HttpResponse readHttpResponse();
 
-	//! @brief Parse the request.
-	//! @param respon The string to parse
+	//! @brief Read an http request.
 	//! @return HttpRequest
-	static HttpRequest parseHttpRequest(const std::string &requ);
+	HttpRequest readHttpRequest();
 
 	void bind(unsigned short port);
 
@@ -133,6 +120,10 @@ protected:
 	SOCKET _sockfd = INVALID_SOCKET; //!< The socket
 	mutable bool _opened = false; //!< The status of the socket.
 	struct sockaddr_in _remote;
+	std::string _buffer;
+	std::mutex _mutex;
+
+	virtual std::string _read(int size);
 };
 
 #endif //DISC_ORD_SOCKET_HPP

@@ -109,14 +109,23 @@ Socket::HttpResponse Socket::makeHttpRequest(const Socket::HttpRequest &request)
 		throw AlreadyOpenedException("This socket is already opened");
 
 	std::string requestString = this->generateHttpRequest(request);
-	std::string response = this->makeRawRequest(request.host, request.portno, requestString);
-	auto answer = this->parseHttpResponse(response);
+	unsigned ip;
 
-	answer.request = request;
+	if (request.ip)
+		ip = request.ip;
+	else
+		ip = inet_addr(request.host.c_str());
+	if (ip != INADDR_NONE)
+		this->connect(ip, request.portno);
+	else
+		this->connect(request.host, request.portno);
 
-	if (answer.returnCode >= 400)
-		throw HTTPErrorException(answer);
-	return answer;
+	HttpResponse response = this->readHttpResponse();
+
+	response.request = request;
+	if (response.returnCode >= 400)
+		throw HTTPErrorException(response);
+	return response;
 }
 
 void Socket::disconnect()
@@ -128,42 +137,175 @@ void Socket::disconnect()
 	this->_opened = false;
 }
 
-std::string Socket::makeRawRequest(const std::string &host, unsigned short portno, const std::string &content)
+std::string Socket::_read(int size)
 {
-	unsigned	ip;
-	std::string	message;
+	std::string result;
 
-	ip = inet_addr(host.c_str());
-	if (ip != INADDR_NONE)
-		this->connect(ip, portno);
-	else
-		this->connect(host, portno);
+	result.resize(size);
+	while (true) {
+		int bytes = recv(this->_sockfd, result.data(), size, 0);
 
-	this->send(content);
-	message = this->readUntilEOF();
-	this->disconnect();
-
-	return message;
+		if (bytes <= 0) {
+			throw EOFException(getLastSocketError());
+		}
+		result.resize(bytes);
+		return result;
+	}
 }
 
 std::string Socket::read(int size)
 {
-	std::string result;
-	char  buffer[1024];
-
-	while (size != 0) {
-		int bytes = recv(this->_sockfd, buffer, (static_cast<unsigned>(size) >= sizeof(buffer)) ? sizeof(buffer) : size, 0);
-
-		if (bytes <= 0) {
-			if (size < 0)
-				break;
-			throw EOFException(getLastSocketError());
-		}
-		result.reserve(result.size() + bytes + 1);
-		result.insert(result.end(), buffer, buffer + bytes);
-		size -= bytes;
+	this->_mutex.lock();
+	if (this->_buffer.empty()) {
+		this->_mutex.unlock();
+		return this->_read(size);
 	}
+
+	std::string result = this->_buffer.substr(0, size);
+
+	this->_buffer = this->_buffer.substr(size);
+	this->_mutex.unlock();
 	return result;
+}
+
+std::string Socket::readExactly(int size)
+{
+	this->_mutex.lock();
+	while (size < this->_buffer.size())
+		this->_buffer += this->_read(1024);
+
+	std::string result = this->_buffer.substr(0, size);
+
+	this->_buffer = this->_buffer.substr(size);
+	this->_mutex.unlock();
+	return result;
+}
+
+std::string Socket::getline(const char *delim)
+{
+	this->_mutex.lock();
+
+	size_t pos = this->_buffer.find_first_of(delim);
+
+	while (pos == std::string::npos) {
+		this->_buffer += this->_read(1024);
+		pos = this->_buffer.find_first_of(delim);
+	}
+
+	std::string result = this->_buffer.substr(0, pos + strlen(delim));
+
+	this->_buffer = this->_buffer.substr(pos + strlen(delim));
+	this->_mutex.unlock();
+	return result;
+}
+
+Socket::HttpRequest Socket::readHttpRequest()
+{
+	auto line = this->getline("\r\n");
+	std::stringstream header(line);
+	HttpRequest request;
+
+	header >> request.method;
+	header >> request.path;
+	header >> request.httpVer;
+
+	if (header.fail())
+		throw InvalidHTTPAnswerException("Invalid HTTP request (Invalid first line)");
+
+	for (std::string str = this->getline("\r\n"); str.length() > 2; str = this->getline("\r\n")) {
+		std::size_t pos = str.find(':');
+
+		if (pos == std::string::npos)
+			throw InvalidHTTPAnswerException("Invalid HTTP request (Invalid header line)");
+
+		std::string name = str.substr(0, pos);
+		size_t end = str.size() - 3;
+
+		for (auto &c : name)
+			c = std::tolower(c);
+		pos++;
+		while (pos < str.size() && std::isspace(str[pos]))
+			pos++;
+		while (pos < end && std::isspace(str[end]))
+			end--;
+		request.header[name] = str.substr(pos, end - pos + 1);
+	}
+
+	try {
+		request.host = request.header.at("host");
+	} catch (std::out_of_range &) {
+		throw InvalidHTTPAnswerException("Invalid HTTP request (no host)");
+	}
+
+	if (request.header.find("transfer-encoding") == request.header.end()) {
+		try {
+			request.body = this->readExactly(std::stoul(request.header.at("content-length")));
+		} catch (std::out_of_range &) {
+		} catch (std::exception &e) {
+			puts(e.what());
+			throw InvalidHTTPAnswerException("Invalid HTTP request (bad content-length)");
+		}
+	} else if (request.header["transfer-encoding"] == "chunked") {
+		try {
+			for (size_t size = std::stoul(this->getline("\r\n"), nullptr, 16); size; size = std::stoul(this->getline("\r\n"), nullptr, 16))
+				request.body += this->readExactly(size);
+		} catch (...) {
+			throw InvalidHTTPAnswerException("Invalid HTTP request (bad chunk length)");
+		}
+	} else
+		throw InvalidHTTPAnswerException("Invalid HTTP request (bad transfer-encoding)");
+	return request;
+}
+
+Socket::HttpResponse Socket::readHttpResponse()
+{
+	std::stringstream header(this->getline("\r\n"));
+	HttpResponse response;
+	std::string str;
+
+	header >> response.httpVer;
+	header >> response.returnCode;
+
+	if (header.fail())
+		throw InvalidHTTPAnswerException("Invalid HTTP response (bad first line)");
+
+	response.codeName = response.codeName.substr(1, response.codeName.length() - 2);
+	for (std::string str = this->getline("\r\n"); str.length() > 2; str = this->getline("\r\n")) {
+		std::size_t pos = str.find(':');
+
+		if (pos == std::string::npos)
+			throw InvalidHTTPAnswerException("Invalid HTTP response (Invalid header line)");
+
+		std::string name = str.substr(0, pos);
+		size_t end = str.size() - 3;
+
+		for (auto &c : name)
+			c = std::tolower(c);
+		pos++;
+		while (pos < str.size() && std::isspace(str[pos]))
+			pos++;
+		while (pos < end && std::isspace(str[end]))
+			end--;
+		response.header[name] = str.substr(pos, end - pos + 1);
+	}
+
+	if (response.header.find("transfer-encoding") == response.header.end()) {
+		try {
+			response.body = this->readExactly(std::stoul(response.header.at("content-length")));
+		} catch (std::out_of_range &) {
+		} catch (...) {
+			throw InvalidHTTPAnswerException("Invalid HTTP response (bad content-length)");
+		}
+	} else if (response.header["transfer-encoding"] == "chunked") {
+		try {
+			for (size_t size = std::stoul(this->getline("\r\n"), nullptr, 16); size; size = std::stoul(this->getline("\r\n"), nullptr, 16))
+				response.body += this->readExactly(size);
+		} catch (...) {
+			throw InvalidHTTPAnswerException("Invalid HTTP response (bad chunk length)");
+		}
+	} else
+		throw InvalidHTTPAnswerException("Invalid HTTP response (bad transfer-encoding)");
+	return response;
 }
 
 void Socket::send(const std::string &msg)
@@ -176,44 +318,6 @@ void Socket::send(const std::string &msg)
 		if (bytes <= 0)
 			throw EOFException(getLastSocketError());
 		pos += bytes;
-	}
-}
-
-std::string Socket::readUntilEOF()
-{
-	std::string result;
-	char  buffer[1024];
-	timeval timeout{1, 0};
-	FD_SET rd;
-	unsigned time = 11;
-
-	while (true) {
-		FD_ZERO(&rd);
-		FD_SET(this->_sockfd, &rd);
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-		switch (select(FD_SETSIZE, &rd, nullptr, nullptr, &timeout)){
-		case 0:
-			if (result.empty() && (--time))
-				continue;
-			return result;
-		case -1:
-			throw EOFException(getLastSocketError());
-		default:
-			break;
-		}
-
-		int bytes = recv(this->_sockfd, buffer, sizeof(buffer), 0);
-
-		if (bytes < 0) {
-			if (WSAGetLastError() == 10035)
-				return result;
-			throw EOFException(getLastSocketError());
-		}
-		result.reserve(result.size() + bytes + 1);
-		result.insert(result.end(), buffer, buffer + bytes);
-		if (bytes < sizeof(buffer))
-			return result;
 	}
 }
 
@@ -308,34 +412,6 @@ std::string Socket::generateHttpRequest(const Socket::HttpRequest &req)
 	return msg.str();
 }
 
-Socket::HttpRequest Socket::parseHttpRequest(const std::string &requ)
-{
-	std::stringstream response(requ);
-	std::string str;
-	HttpRequest request;
-
-	response >> request.method;
-	response >> request.path;
-	response >> request.httpVer;
-
-	std::getline(response, str);
-	while (std::getline(response, str) && str.length() > 2) {
-		std::size_t	pos = str.find(':');
-
-		if (pos == std::string::npos)
-			throw InvalidHTTPAnswerException("Invalid HTTP request");
-		request.header[str.substr(0, pos)] = str.substr(pos + 2, str.size() - pos - 3);
-	}
-
-	try {
-		request.host = request.header.at("Host");
-	} catch (std::out_of_range &) {
-		throw InvalidHTTPAnswerException("Invalid HTTP request");
-	}
-	request.body = requ.substr(response.tellg());
-	return request;
-}
-
 void Socket::setNoDestroy(bool noDestroy) const
 {
 	this->_noDestroy = noDestroy;
@@ -365,30 +441,4 @@ Socket &Socket::operator=(const Socket &socket)
 	socket.setNoDestroy(true);
 	this->setNoDestroy(false);
 	return *this;
-}
-
-Socket::HttpResponse Socket::parseHttpResponse(const std::string &respon)
-{
-	std::stringstream	response(respon);
-	HttpResponse		request;
-	std::string		str;
-
-	response >> request.httpVer;
-	response >> request.returnCode;
-
-	if (response.fail())
-		throw InvalidHTTPAnswerException("Invalid HTTP response");
-
-	std::getline(response, request.codeName);
-	request.codeName = request.codeName.substr(1, request.codeName.length() - 2);
-	while (std::getline(response, str) && str.length() > 2) {
-		std::size_t	pos = str.find(':');
-
-		if (pos == std::string::npos)
-			throw InvalidHTTPAnswerException("Invalid HTTP response");
-		request.header[str.substr(0, pos)] = str.substr(pos + 2, str.size() - pos - 3);
-	}
-
-	request.body = respon.substr(response.tellg());
-	return request;
 }

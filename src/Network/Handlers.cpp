@@ -123,7 +123,7 @@ Socket::HttpResponse state(const Socket::HttpRequest &requ)
 	if (requ.method != "GET")
 		throw AbortConnectionException(405);
 
-	response.header["content-type"] = "application/json";
+	response.header["Content-Type"] = "application/json";
 	response.body = cacheToJson(_cache);
 	return response;
 }
