@@ -23,7 +23,9 @@ enum Opcodes {
 
 Socket::HttpResponse root(const Socket::HttpRequest &requ);
 Socket::HttpResponse state(const Socket::HttpRequest &requ);
-Socket::HttpResponse connect(const Socket::HttpRequest &requ);
+Socket::HttpResponse getCharName(const Socket::HttpRequest &requ);
+Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ);
+Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ);
 void onNewWebSocket(WebSocket &s);
 void sendOpcode(WebSocket &s, Opcodes op, const std::string &data);
 void broadcastOpcode(Opcodes op, const std::string &data);

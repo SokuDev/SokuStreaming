@@ -28,6 +28,7 @@ private:
 	std::function<void (WebSocket &sock, const std::string &msg)> _onMessage;
 	std::function<void (WebSocket &sock, const std::exception &e)> _onError;
 	bool _closed = false;
+	int _staticAge;
 	Socket _sock;
 	std::thread _thread;
 	std::vector<std::shared_ptr<WebSocketConnection>> _webSocks;
@@ -45,7 +46,7 @@ public:
 	static const std::map<std::string, std::string> types;
 	static const std::map<unsigned short, std::string> codes;
 
-	WebServer() = default;
+	WebServer(int staticAge);
 	~WebServer();
 	void broadcast(const std::string &msg);
 	void onWebSocketConnect(const std::function<void (WebSocket &sock)> &fct);

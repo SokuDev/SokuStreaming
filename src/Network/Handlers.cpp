@@ -3,11 +3,15 @@
 //
 
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include "Handlers.hpp"
 #include "../State.hpp"
 #include "../Exceptions.hpp"
+#include "package.hpp"
 
-Socket::HttpResponse connect(const Socket::HttpRequest &requ)
+extern ShadyCore::PackageEx package;
+
+Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ)
 {
 	if (requ.ip != 0x0100007F)
 		throw AbortConnectionException(403);
@@ -72,6 +76,65 @@ Socket::HttpResponse root(const Socket::HttpRequest &requ)
 		throw AbortConnectionException(404);
 	response.header["Location"] = buffer;
 	response.returnCode = 301;
+	return response;
+}
+
+Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
+{
+	if (requ.path == "/internal")
+		throw AbortConnectionException(501);
+
+	auto path = requ.path.substr(strlen("/internal/"));
+	auto it = package.find(path);
+	Socket::HttpResponse response;
+
+	if (it == package.end())
+		throw AbortConnectionException(404);
+
+	auto &stream = it.open();
+	std::stringstream body;
+
+	switch (it->first.fileType.type) {
+	case ShadyCore::FileType::TYPE_UNKNOWN:
+		break;
+	case ShadyCore::FileType::TYPE_TEXT:
+		break;
+	case ShadyCore::FileType::TYPE_TABLE:
+		break;
+	case ShadyCore::FileType::TYPE_LABEL:
+		break;
+	case ShadyCore::FileType::TYPE_IMAGE: {
+		ShadyCore::Image image;
+
+		response.header["content-type"] = "image/png";
+		ShadyCore::getResourceReader(it.fileType())(&image, stream);
+		ShadyCore::getResourceWriter({ShadyCore::FileType::TYPE_IMAGE, ShadyCore::FileType::IMAGE_PNG})(&image, body);
+		break;
+	}
+	case ShadyCore::FileType::TYPE_PALETTE:
+		break;
+	case ShadyCore::FileType::TYPE_SFX:
+		break;
+	case ShadyCore::FileType::TYPE_BGM:
+		break;
+	case ShadyCore::FileType::TYPE_SCHEMA:
+		break;
+	case ShadyCore::FileType::TYPE_TEXTURE:
+		break;
+	}
+	it.close(stream);
+	response.body = body.str();
+	response.returnCode = 200;
+	return response;
+}
+
+Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
+{
+	auto name = SokuLib::getCharName(std::stoul(requ.path.substr(strlen("/charName/"))));
+	Socket::HttpResponse response;
+
+	response.body = name;
+	response.returnCode = 200;
 	return response;
 }
 

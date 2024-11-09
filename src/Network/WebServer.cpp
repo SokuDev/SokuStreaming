@@ -5,6 +5,7 @@
 #include <csignal>
 #include <iostream>
 #include <fstream>
+#include <regex>
 #include "WebServer.hpp"
 #include "../Exceptions.hpp"
 
@@ -94,6 +95,11 @@ const std::map<unsigned short, std::string> WebServer::codes{
 	{ 511, "Network authentication required" },
 };
 
+WebServer::WebServer(int staticAge) :
+	_staticAge(staticAge)
+{
+}
+
 void WebServer::addRoute(const std::string &&route, std::function<Socket::HttpResponse(const Socket::HttpRequest &)> &&fct)
 {
 	this->_routes[route] = fct;
@@ -162,7 +168,9 @@ void WebServer::_serverLoop()
 			if (requ.path == "/chat")
 				return this->_addWebSocket(newConnection, requ);
 			else {
-				auto it = this->_routes.find(requ.path);
+				auto it = std::find_if(this->_routes.begin(), this->_routes.end(), [&requ](auto &pair){
+					return std::regex_match(requ.path, std::regex{pair.first});
+				});
 
 				response.request = requ;
 				if (it != this->_routes.end())
@@ -266,7 +274,7 @@ Socket::HttpResponse WebServer::_checkFolders(const Socket::HttpRequest &request
 			if (stream.fail())
 				throw AbortConnectionException(404);
 			response.returnCode = 200;
-			response.header["Cache-Control"] = "private, immutable, max-age=3600";
+			response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(this->_staticAge);
 			response.header["Content-Type"] = type;
 			response.body = {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
 			return response;
@@ -363,4 +371,3 @@ void WebServer::onWebSocketError(const std::function<void(WebSocket &, const std
 {
 	this->_onError = fct;
 }
-

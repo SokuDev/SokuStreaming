@@ -1,3 +1,6 @@
 [submodule "SokuLib"]
 	path = SokuLib
 	url = https://github.com/SokuDev/SokuLib
+[submodule "shady-packer"]
+	path = shady-packer
+	url = https://github.com/enebe-nb/shady-packer.git

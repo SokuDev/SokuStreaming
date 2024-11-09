@@ -9,7 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-add_definitions(-DWINVER=0x0501 -D_WIN32_WINNT=0x0501)
+include_directories(include shady-packer/src/Core "${CMAKE_BINARY_DIR}/shady-packer/thirdparty/zlib")
+add_definitions(-DWINVER=0x600 -D_WIN32_WINNT=0x600)
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
 	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++11-narrowing -Wno-microsoft-cast")
 endif ()
@@ -19,6 +20,19 @@ SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Brepro")
 
 # SokuLib
 add_subdirectory(SokuLib)
+
+# shady-core
+set(SHADY_ENABLE_EXECUTABLE OFF)
+set(SHADY_ENABLE_MODULE OFF)
+set(ENABLE_BZ2 OFF)
+set(ENABLE_LZMA OFF)
+set(ENABLE_ZSTD OFF)
+set(ENABLE_COMMONCRYPTO OFF)
+set(ENABLE_GNUTLS OFF)
+set(ENABLE_MBEDTLS OFF)
+set(ENABLE_OPENSSL OFF)
+set(ENABLE_WINDOWS_CRYPTO OFF)
+add_subdirectory(shady-packer)
 
 # Module
 add_library(
@@ -47,6 +61,7 @@ target_include_directories("${PROJECT_NAME}" PRIVATE include SokuLib/directx src
 target_link_directories("${PROJECT_NAME}" PRIVATE lib)
 target_link_libraries(
 	"${PROJECT_NAME}"
+	shady-core
 	SokuLib
 	shlwapi
 	d3d9

@@ -12,6 +12,14 @@
 #include "Network/Handlers.hpp"
 #include "State.hpp"
 #include "DeprecatedElements.hpp"
+#include "package.hpp"
+
+namespace ShadyCore {
+	void* Allocate(size_t s) { return SokuLib::NewFct(s); }
+	void Deallocate(void* p) { SokuLib::DeleteFct(p); }
+}
+
+ShadyCore::PackageEx package;
 
 char profilePath[1024 + MAX_PATH];
 char parentPath[1024 + MAX_PATH];
@@ -111,14 +119,31 @@ void LoadSettings()
 	keys[KEY_INCREASE_R_SCORE] = GetPrivateProfileInt("Keys", "IncreaseRightScore", '9', profilePath);
 	keys[KEY_CHANGE_R_NAME]    = GetPrivateProfileInt("Keys", "ChangeRightName",    '0', profilePath);
 
-	webServer = std::make_unique<WebServer>();
-	webServer->addRoute("/", root);
-	webServer->addRoute("/state", state);
-	Socket::HttpResponse connect(const Socket::HttpRequest &requ);
-	webServer->addRoute("/connect", connect);
+	webServer = std::make_unique<WebServer>(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
+	webServer->addRoute("^/$", root);
+	webServer->addRoute("^/state$", state);
+	webServer->addRoute("^/connectRoute$", connectRoute);
+	webServer->addRoute("^/charName/\\d+?$", getCharName);
+	webServer->addRoute("^/internal(/.*)?$", loadInternalAsset);
 	webServer->addStaticFolder("/static", std::string(parentPath) + "/static");
 	webServer->start(port);
 	webServer->onWebSocketConnect(onNewWebSocket);
+}
+
+void __fastcall buildDatList(const char *path)
+{
+	package.merge(new ShadyCore::Package(path));
+}
+
+void __declspec(naked) buildDatList_hook()
+{
+	__asm {
+		PUSH ECX
+		MOV ECX, [ESP + 12]
+		CALL buildDatList
+		POP ECX
+		RET
+	}
 }
 
 void hookFunctions()
@@ -175,6 +200,10 @@ void hookFunctions()
 		)
 	);*/
 	::VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, old, &old);
+	::VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, PAGE_EXECUTE_WRITECOPY, &old);
+	SokuLib::TamperNearCall(0x40D1D4, buildDatList_hook);
+	SokuLib::TamperNearJmp(0x40D1D9, 0x41BB50);
+	::VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);
 	::FlushInstructionCache(GetCurrentProcess(), NULL, 0);
 }
 
