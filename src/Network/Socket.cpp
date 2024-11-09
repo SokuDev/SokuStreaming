@@ -137,28 +137,36 @@ void Socket::disconnect()
 	this->_opened = false;
 }
 
-std::string Socket::_read(int size)
+std::string Socket::_read(int size, timeval *timeout)
 {
+	FD_SET set;
 	std::string result;
 
-	result.resize(size);
-	while (true) {
-		int bytes = recv(this->_sockfd, result.data(), size, 0);
+	FD_ZERO(&set);
+	FD_SET(this->_sockfd, &set);
+	if (select(this->_sockfd + 1, &set, nullptr, nullptr, timeout) <= 0)
+		throw EOFException(GetLastError() == 0 ? "End of file" : getLastSocketError());
 
-		if (bytes <= 0) {
-			throw EOFException(getLastSocketError());
-		}
-		result.resize(bytes);
+	result.resize(size);
+
+	int bytes = recv(this->_sockfd, result.data(), size, 0);
+
+	if (bytes == 0 && !result.empty())
 		return result;
-	}
+	if (bytes == 0)
+		throw EOFException("End of file");
+	if (bytes < 0)
+		throw EOFException(getLastSocketError());
+	result.resize(bytes);
+	return result;
 }
 
-std::string Socket::read(int size)
+std::string Socket::read(int size, timeval *timeout)
 {
 	this->_mutex.lock();
 	if (this->_buffer.empty()) {
 		this->_mutex.unlock();
-		return this->_read(size);
+		return this->_read(size, timeout);
 	}
 
 	std::string result = this->_buffer.substr(0, size);
@@ -168,40 +176,52 @@ std::string Socket::read(int size)
 	return result;
 }
 
-std::string Socket::readExactly(int size)
+std::string Socket::readExactly(int size, timeval *timeout)
 {
+	if (size == 0)
+		return "";
+
 	this->_mutex.lock();
-	while (size < this->_buffer.size())
-		this->_buffer += this->_read(1024);
+	try {
+		while (size < this->_buffer.size())
+			this->_buffer += this->_read(1024, timeout);
 
-	std::string result = this->_buffer.substr(0, size);
+		std::string result = this->_buffer.substr(0, size);
 
-	this->_buffer = this->_buffer.substr(size);
-	this->_mutex.unlock();
-	return result;
-}
-
-std::string Socket::getline(const char *delim)
-{
-	this->_mutex.lock();
-
-	size_t pos = this->_buffer.find_first_of(delim);
-
-	while (pos == std::string::npos) {
-		this->_buffer += this->_read(1024);
-		pos = this->_buffer.find_first_of(delim);
+		this->_buffer = this->_buffer.substr(size);
+		this->_mutex.unlock();
+		return result;
+	} catch (...) {
+		this->_mutex.unlock();
+		throw;
 	}
-
-	std::string result = this->_buffer.substr(0, pos + strlen(delim));
-
-	this->_buffer = this->_buffer.substr(pos + strlen(delim));
-	this->_mutex.unlock();
-	return result;
 }
 
-Socket::HttpRequest Socket::readHttpRequest()
+std::string Socket::getline(const char *delim, timeval *timeout)
 {
-	auto line = this->getline("\r\n");
+	this->_mutex.lock();
+	try {
+		size_t pos = this->_buffer.find_first_of(delim);
+
+		while (pos == std::string::npos) {
+			this->_buffer += this->_read(1024, timeout);
+			pos = this->_buffer.find_first_of(delim);
+		}
+
+		std::string result = this->_buffer.substr(0, pos + strlen(delim));
+
+		this->_buffer = this->_buffer.substr(pos + strlen(delim));
+		this->_mutex.unlock();
+		return result;
+	} catch (...) {
+		this->_mutex.unlock();
+		throw;
+	}
+}
+
+Socket::HttpRequest Socket::readHttpRequest(timeval *timeout)
+{
+	auto line = this->getline("\r\n", timeout);
 	std::stringstream header(line);
 	HttpRequest request;
 
@@ -212,7 +232,7 @@ Socket::HttpRequest Socket::readHttpRequest()
 	if (header.fail())
 		throw InvalidHTTPAnswerException("Invalid HTTP request (Invalid first line)");
 
-	for (std::string str = this->getline("\r\n"); str.length() > 2; str = this->getline("\r\n")) {
+	for (std::string str = this->getline("\r\n", timeout); str.length() > 2; str = this->getline("\r\n", timeout)) {
 		std::size_t pos = str.find(':');
 
 		if (pos == std::string::npos)
@@ -239,7 +259,7 @@ Socket::HttpRequest Socket::readHttpRequest()
 
 	if (request.header.find("transfer-encoding") == request.header.end()) {
 		try {
-			request.body = this->readExactly(std::stoul(request.header.at("content-length")));
+			request.body = this->readExactly(std::stoul(request.header.at("content-length")), timeout);
 		} catch (std::out_of_range &) {
 		} catch (std::exception &e) {
 			puts(e.what());
@@ -248,7 +268,7 @@ Socket::HttpRequest Socket::readHttpRequest()
 	} else if (request.header["transfer-encoding"] == "chunked") {
 		try {
 			for (size_t size = std::stoul(this->getline("\r\n"), nullptr, 16); size; size = std::stoul(this->getline("\r\n"), nullptr, 16))
-				request.body += this->readExactly(size);
+				request.body += this->readExactly(size, timeout);
 		} catch (...) {
 			throw InvalidHTTPAnswerException("Invalid HTTP request (bad chunk length)");
 		}
@@ -257,9 +277,9 @@ Socket::HttpRequest Socket::readHttpRequest()
 	return request;
 }
 
-Socket::HttpResponse Socket::readHttpResponse()
+Socket::HttpResponse Socket::readHttpResponse(timeval *timeout)
 {
-	std::stringstream header(this->getline("\r\n"));
+	std::stringstream header(this->getline("\r\n", timeout));
 	HttpResponse response;
 	std::string str;
 
@@ -270,7 +290,7 @@ Socket::HttpResponse Socket::readHttpResponse()
 		throw InvalidHTTPAnswerException("Invalid HTTP response (bad first line)");
 
 	response.codeName = response.codeName.substr(1, response.codeName.length() - 2);
-	for (std::string str = this->getline("\r\n"); str.length() > 2; str = this->getline("\r\n")) {
+	for (std::string str = this->getline("\r\n", timeout); str.length() > 2; str = this->getline("\r\n", timeout)) {
 		std::size_t pos = str.find(':');
 
 		if (pos == std::string::npos)
@@ -291,7 +311,7 @@ Socket::HttpResponse Socket::readHttpResponse()
 
 	if (response.header.find("transfer-encoding") == response.header.end()) {
 		try {
-			response.body = this->readExactly(std::stoul(response.header.at("content-length")));
+			response.body = this->readExactly(std::stoul(response.header.at("content-length")), timeout);
 		} catch (std::out_of_range &) {
 		} catch (...) {
 			throw InvalidHTTPAnswerException("Invalid HTTP response (bad content-length)");
@@ -299,7 +319,7 @@ Socket::HttpResponse Socket::readHttpResponse()
 	} else if (response.header["transfer-encoding"] == "chunked") {
 		try {
 			for (size_t size = std::stoul(this->getline("\r\n"), nullptr, 16); size; size = std::stoul(this->getline("\r\n"), nullptr, 16))
-				response.body += this->readExactly(size);
+				response.body += this->readExactly(size, timeout);
 		} catch (...) {
 			throw InvalidHTTPAnswerException("Invalid HTTP response (bad chunk length)");
 		}
@@ -328,7 +348,7 @@ bool	Socket::isOpen() const
 
 	FD_ZERO(&set);
 	FD_SET(this->_sockfd, &set);
-	if (this->_opened && select(0, &set, nullptr, nullptr, &time) == -1)
+	if (this->_opened && select(this->_sockfd + 1, &set, nullptr, nullptr, &time) == -1)
 		this->_opened = false;
 	return (this->_opened);
 }

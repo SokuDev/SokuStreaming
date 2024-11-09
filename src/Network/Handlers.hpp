@@ -28,5 +28,7 @@ void onNewWebSocket(WebSocket &s);
 void sendOpcode(WebSocket &s, Opcodes op, const std::string &data);
 void broadcastOpcode(Opcodes op, const std::string &data);
 
+extern char profilePath[1024 + MAX_PATH];
+extern char parentPath[1024 + MAX_PATH];
 
 #endif //SWRSTOYS_HANDLERS_HPP

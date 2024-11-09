@@ -74,9 +74,9 @@ public:
 	//! @param msg The message to send.
 	virtual void send(const std::string &msg);
 
-	std::string read(int size);
-	std::string readExactly(int size);
-	std::string getline(const char *delim = "\n");
+	std::string read(int size, timeval *timeout = nullptr);
+	std::string readExactly(int size, timeval *timeout = nullptr);
+	std::string getline(const char *delim = "\n", timeval *timeout = nullptr);
 
 	//! @brief Generate a http payload from a HttpRequest
 	//! @param request The request to generate
@@ -95,11 +95,11 @@ public:
 
 	//! @brief Read an http response.
 	//! @return HttpResponse
-	HttpResponse readHttpResponse();
+	HttpResponse readHttpResponse(timeval *timeout = nullptr);
 
 	//! @brief Read an http request.
 	//! @return HttpRequest
-	HttpRequest readHttpRequest();
+	HttpRequest readHttpRequest(timeval *timeout = nullptr);
 
 	void bind(unsigned short port);
 
@@ -123,7 +123,7 @@ protected:
 	std::string _buffer;
 	std::mutex _mutex;
 
-	virtual std::string _read(int size);
+	virtual std::string _read(int size, timeval *timeout = nullptr);
 };
 
 #endif //DISC_ORD_SOCKET_HPP

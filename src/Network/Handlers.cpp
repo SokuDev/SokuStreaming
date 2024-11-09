@@ -63,10 +63,14 @@ Socket::HttpResponse connect(const Socket::HttpRequest &requ)
 Socket::HttpResponse root(const Socket::HttpRequest &requ)
 {
 	Socket::HttpResponse response;
+	char buffer[1024] = {0};
 
 	if (requ.method != "GET")
 		throw AbortConnectionException(405);
-	response.header["Location"] = "http://" + requ.host + "/static/html/overlay.html";
+	GetPrivateProfileStringA("Server", "DefaultPage", "", buffer, sizeof(buffer), profilePath);
+	if (!*buffer)
+		throw AbortConnectionException(404);
+	response.header["Location"] = buffer;
 	response.returnCode = 301;
 	return response;
 }

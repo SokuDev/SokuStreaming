@@ -152,8 +152,10 @@ void WebServer::_serverLoop()
 #endif
 	try {
 		try {
+			timeval time = {1, 0};
+
 			requ.ip = newConnection.getRemote().sin_addr.s_addr;
-			requ = newConnection.readHttpRequest();
+			requ = newConnection.readHttpRequest(&time);
 			requ.ip = newConnection.getRemote().sin_addr.s_addr;
 			if (requ.httpVer != "HTTP/1.1")
 				throw AbortConnectionException(505);
@@ -175,6 +177,8 @@ void WebServer::_serverLoop()
 			response = WebServer::_makeGenericPage(400);
 		} catch (NotImplementedException &) {
 			response = WebServer::_makeGenericPage(501);
+		} catch (EOFException &) {
+			response = WebServer::_makeGenericPage(408);
 		} catch (AbortConnectionException &e) {
 			response = WebServer::_makeGenericPage(e.getCode());
 		}

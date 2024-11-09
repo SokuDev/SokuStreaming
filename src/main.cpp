@@ -13,6 +13,9 @@
 #include "State.hpp"
 #include "DeprecatedElements.hpp"
 
+char profilePath[1024 + MAX_PATH];
+char parentPath[1024 + MAX_PATH];
+
 int __fastcall CTitle_OnProcess(Title *This) {
 	// super
 	int ret = (This->*s_origCTitle_Process)();
@@ -87,7 +90,7 @@ int __fastcall CBattleManager_Render(SokuLib::BattleManager *This) {
 }
 
 // �ݒ胍�[�h
-void LoadSettings(LPCSTR profilePath, LPCSTR parentPath)
+void LoadSettings()
 {
 	// �����V���b�g�_�E��
 	enabled = GetPrivateProfileInt("SokuStreaming", "Enabled", 1, profilePath) != 0;
@@ -185,14 +188,11 @@ extern "C"
 __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hParentModule)
 {
 	try {
-		char profilePath[1024 + MAX_PATH];
-		char profileParent[1024 + MAX_PATH];
-
 		GetModuleFileName(hMyModule, profilePath, 1024);
 		PathRemoveFileSpec(profilePath);
-		strcpy(profileParent, profilePath);
+		strcpy(parentPath, profilePath);
 		PathAppend(profilePath, "SokuStreaming.ini");
-		LoadSettings(profilePath, profileParent);
+		LoadSettings();
 
 		if (!enabled)
 			return true;
