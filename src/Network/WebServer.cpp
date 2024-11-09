@@ -154,9 +154,9 @@ void WebServer::_serverLoop()
 		try {
 			timeval time = {1, 0};
 
-			requ.ip = newConnection.getRemote().sin_addr.s_addr;
 			requ = newConnection.readHttpRequest(&time);
 			requ.ip = newConnection.getRemote().sin_addr.s_addr;
+			requ.portno = newConnection.getRemote().sin_port;
 			if (requ.httpVer != "HTTP/1.1")
 				throw AbortConnectionException(505);
 			if (requ.path == "/chat")
@@ -193,10 +193,8 @@ void WebServer::_serverLoop()
 	std::cout << inet_ntoa(newConnection.getRemote().sin_addr) << ":" << newConnection.getRemote().sin_port << " ";
 	if (!requ.httpVer.empty())
 		std::cout << requ.path;
-	else {
+	else
 		std::cout << "<Malformed HTTP request>";
-		std::cerr << "Parsing error of request" << std::endl;
-	}
 	std::cout << ": " << response.returnCode << std::endl;
 #endif
 	try {

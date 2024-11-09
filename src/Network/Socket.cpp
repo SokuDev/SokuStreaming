@@ -262,7 +262,6 @@ Socket::HttpRequest Socket::readHttpRequest(timeval *timeout)
 			request.body = this->readExactly(std::stoul(request.header.at("content-length")), timeout);
 		} catch (std::out_of_range &) {
 		} catch (std::exception &e) {
-			puts(e.what());
 			throw InvalidHTTPAnswerException("Invalid HTTP request (bad content-length)");
 		}
 	} else if (request.header["transfer-encoding"] == "chunked") {
