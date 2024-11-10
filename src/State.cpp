@@ -217,10 +217,14 @@ void updateCache(bool isMultiplayer)
 	std::sort(_cache.rightCards.begin(), _cache.rightCards.end());
 
 	//Hands
-	for (int i = 0; i < battleMgr.leftCharacterManager.cardCount; i++)
+	for (int i = 0; i < battleMgr.leftCharacterManager.cardCount; i++) {
 		_cache.leftHand.push_back(leftHand.handCardBase[(i + leftHand.selectedCard) % leftHand.handCardMax]->id);
-	for (int i = 0; i < battleMgr.rightCharacterManager.cardCount; i++)
+		_cache.leftUsed.erase(std::find(_cache.leftUsed.begin(), _cache.leftUsed.end(), _cache.leftHand.back()));
+	}
+	for (int i = 0; i < battleMgr.rightCharacterManager.cardCount; i++) {
 		_cache.rightHand.push_back(rightHand.handCardBase[(i + rightHand.selectedCard) % rightHand.handCardMax]->id);
+		_cache.rightUsed.erase(std::find(_cache.rightUsed.begin(), _cache.rightUsed.end(), _cache.rightHand.back()));
+	}
 	std::sort(_cache.leftHand.begin(), _cache.leftHand.end());
 	std::sort(_cache.rightHand.begin(), _cache.rightHand.end());
 	std::sort(_cache.leftUsed.begin(), _cache.leftUsed.end());

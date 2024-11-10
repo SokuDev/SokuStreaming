@@ -29,19 +29,26 @@ img.rightChr {
     z-index: -1;
 }
 
-img.centered {
+img.centeredLeft {
     z-index: -2;
     position: absolute;
-    top: -9999px;
-    left: -9999px;
-    right: -9999px;
-    bottom: -9999px;
+    height: 100.7%;
+    top: 0px;
+    right: 0px;
+    margin: auto;
+}
+
+img.centeredRight {
+    z-index: -2;
+    position: absolute;
+    top: 0px;
+    right: 0px;
     height: 100.7%;
     margin: auto;
 }
 
 div.deck {
-    height: 40%;
+    height: 30%;
     position: absolute;
     bottom: 0;
 }
@@ -87,7 +94,7 @@ div.stat {
 
 div.stats {
     position: absolute;
-    bottom: 40%;
+    bottom: 30%;
 }
 
 img.icon {

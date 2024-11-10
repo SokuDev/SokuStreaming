@@ -19,8 +19,9 @@ namespace ShadyCore {
 	void Deallocate(void* p) { SokuLib::DeleteFct(p); }
 }
 
-ShadyCore::PackageEx package;
+ShadyCore::PackageEx *package = nullptr;
 
+wchar_t soku2Path[1024 + MAX_PATH];
 char profilePath[1024 + MAX_PATH];
 char parentPath[1024 + MAX_PATH];
 
@@ -97,6 +98,63 @@ int __fastcall CBattleManager_Render(SokuLib::BattleManager *This) {
 	return ret;
 }
 
+void loadSoku2Config()
+{
+	puts("Looking for Soku2 config...");
+
+	int argc;
+	wchar_t app_path[MAX_PATH];
+	wchar_t setting_path[MAX_PATH];
+	wchar_t **arg_list = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+	wcsncpy(app_path, arg_list[0], MAX_PATH);
+	PathRemoveFileSpecW(app_path);
+	if (GetEnvironmentVariableW(L"SWRSTOYS", setting_path, sizeof(setting_path)) <= 0) {
+		if (arg_list && argc > 1 && StrStrIW(arg_list[1], L"ini")) {
+			wcscpy(setting_path, arg_list[1]);
+			LocalFree(arg_list);
+		} else {
+			wcscpy(setting_path, app_path);
+			PathAppendW(setting_path, L"\\SWRSToys.ini");
+		}
+		if (arg_list) {
+			LocalFree(arg_list);
+		}
+	}
+	printf("Config file is %S\n", setting_path);
+
+	wchar_t moduleKeys[1024];
+	wchar_t moduleValue[MAX_PATH];
+	GetPrivateProfileStringW(L"Module", nullptr, nullptr, moduleKeys, sizeof(moduleKeys), setting_path);
+	for (wchar_t *key = moduleKeys; *key; key += wcslen(key) + 1) {
+		wchar_t module_path[MAX_PATH];
+
+		GetPrivateProfileStringW(L"Module", key, nullptr, moduleValue, sizeof(moduleValue), setting_path);
+
+		wchar_t *filename = wcsrchr(moduleValue, '/');
+
+		printf("Check %S\n", moduleValue);
+		if (!filename)
+			filename = app_path;
+		else
+			filename++;
+		for (int i = 0; filename[i]; i++)
+			filename[i] = tolower(filename[i]);
+		if (wcscmp(filename, L"soku2.dll") != 0)
+			continue;
+
+		wcscpy(module_path, app_path);
+		PathAppendW(module_path, moduleValue);
+		while (auto result = wcschr(module_path, '/'))
+			*result = '\\';
+		PathRemoveFileSpecW(module_path);
+		printf("Found Soku2 module folder at %S\n", module_path);
+		PathAppendW(module_path, L"\\config\\info");
+		wcscpy(soku2Path, module_path);
+		return;
+	}
+}
+
 // �ݒ胍�[�h
 void LoadSettings()
 {
@@ -119,12 +177,15 @@ void LoadSettings()
 	keys[KEY_INCREASE_R_SCORE] = GetPrivateProfileInt("Keys", "IncreaseRightScore", '9', profilePath);
 	keys[KEY_CHANGE_R_NAME]    = GetPrivateProfileInt("Keys", "ChangeRightName",    '0', profilePath);
 
+	loadSoku2Config();
+
 	webServer = std::make_unique<WebServer>(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
 	webServer->addRoute("^/$", root);
 	webServer->addRoute("^/state$", state);
 	webServer->addRoute("^/connectRoute$", connectRoute);
-	webServer->addRoute("^/charName/\\d+?$", getCharName);
+	webServer->addRoute("^/charName/\\d+$", getCharName);
 	webServer->addRoute("^/internal(/.*)?$", loadInternalAsset);
+	webServer->addRoute("^/skillSheet/\\d+$", loadSkillSheet);
 	webServer->addStaticFolder("/static", std::string(parentPath) + "/static");
 	webServer->start(port);
 	webServer->onWebSocketConnect(onNewWebSocket);
@@ -132,7 +193,12 @@ void LoadSettings()
 
 void __fastcall buildDatList(const char *path)
 {
-	package.merge(new ShadyCore::Package(path));
+	auto old = package;
+
+	package = new ShadyCore::PackageEx();
+	package->merge(new ShadyCore::Package(path));
+	if (old)
+		package->merge(old);
 }
 
 void __declspec(naked) buildDatList_hook()

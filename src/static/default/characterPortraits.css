@@ -1,0 +1,309 @@
+/* Character stand alignment file */
+
+/* Marisa */
+img.centeredLeft.chr1 {
+    left: -300px;
+    bottom: 150px;
+}
+
+img.centeredRight.chr1 {
+    left: -900px;
+    bottom: 150px;
+}
+
+/* Alice */
+img.centeredLeft.chr3 {
+    bottom: 0;
+}
+
+img.centeredRight.chr3 {
+    bottom: 0;
+}
+
+/* Patchouli */
+img.centeredLeft.chr4 {
+    left: -425px; /* -375 -> -425 */
+}
+
+img.centeredRight.chr4 {
+    left: -775px;
+}
+
+/* Youmu */
+img.centeredLeft.chr5 {
+    left: -425px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr5 {
+    left: -775px;
+    bottom: 200px;
+}
+
+/* Remilia */
+img.centeredLeft.chr6 {
+    left: -375px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr6 {
+    left: -825px;
+    bottom: 200px;
+}
+
+/* Yuyuko */
+img.centeredLeft.chr7 {
+    left: -375px;
+}
+
+img.centeredRight.chr7 {
+    left: -825px;
+}
+
+/* Suika */
+img.centeredLeft.chr9 {
+    left: -550px;
+    bottom: 400px;
+}
+
+img.centeredRight.chr9 {
+    left: -650px;
+    bottom: 400px;
+}
+
+/* Reisen */
+img.centeredLeft.chr10 {
+    left: -550px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr10 {
+    left: -650px;
+    bottom: 200px;
+}
+
+/* Aya */
+img.centeredLeft.chr11 {
+    left: -550px;
+    bottom: 500px;
+}
+
+img.centeredRight.chr11 {
+    left: -650px;
+    bottom: 500px;
+}
+
+/* Komachi */
+img.centeredLeft.chr12 {
+    left: -425px;
+}
+
+img.centeredRight.chr12 {
+    left: -775px;
+}
+
+/* Iku */
+img.centeredLeft.chr13 {
+    left: -475px;
+    bottom: 250px;
+}
+
+img.centeredRight.chr13 {
+    left: -725px;
+    bottom: 250px;
+}
+
+/* Cirno */
+img.centeredLeft.chr16 {
+    left: -350px;
+    bottom: 250px;
+}
+
+img.centeredRight.chr16 {
+    left: -850px;
+    bottom: 250px;
+}
+
+/* Meiling */
+img.centeredLeft.chr17 {
+    left: -425px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr17 {
+    left: -775px;
+    bottom: 200px;
+}
+
+/* Utsuho */
+img.centeredLeft.chr18 {
+    left: -425px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr18 {
+    left: -775px;
+    bottom: 200px;
+}
+
+/* Suwako */
+img.centeredLeft.chr19 {
+    left: -425px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr19 {
+    left: -775px;
+    bottom: 200px;
+}
+
+/* Momiji */
+img.centeredLeft.chr22 {
+    left: -375px;
+    bottom: 350px;
+}
+
+img.centeredRight.chr22 {
+    left: -825px;
+    bottom: 350px;
+}
+
+/* Clownpiece */
+img.centeredLeft.chr23 {
+    left: -425px;
+    bottom: 150px;
+}
+
+img.centeredRight.chr23 {
+    left: -775px;
+    bottom: 150px;
+}
+
+/* Flandre */
+img.centeredLeft.chr24 {
+    left: -350px;
+    bottom: 400px;
+}
+
+img.centeredRight.chr24 {
+    left: -850px;
+    bottom: 400px;
+}
+
+/* Rin */
+img.centeredLeft.chr25 {
+    left: -475px;
+    bottom: 200px;
+}
+
+img.centeredRight.chr25 {
+    left: -725px;
+    bottom: 200px;
+}
+
+/* Yuuka */
+img.centeredLeft.chr26 {
+    left: -475px;
+    bottom: 300px;
+}
+
+img.centeredRight.chr26 {
+    left: -725px;
+    bottom: 300px;
+}
+
+/* Kaguya */
+img.centeredLeft.chr27 {
+    left: -300px;
+    bottom: 0;
+}
+
+img.centeredRight.chr27 {
+    left: -900px;
+    bottom: 0;
+}
+
+/* Mokou */
+img.centeredLeft.chr28 {
+    bottom: 250px;
+}
+
+img.centeredRight.chr28 {
+    bottom: 250px;
+}
+
+/* Mima */
+img.centeredLeft.chr29 {
+    left: -425px;
+}
+
+img.centeredRight.chr29 {
+    left: -775px;
+}
+
+/* Shou */
+img.centeredLeft.chr30 {
+    left: -475px;
+}
+
+img.centeredRight.chr30 {
+    left: -725px;
+}
+
+/* Murasa */
+img.centeredLeft.chr31 {
+    left: -375px;
+}
+
+img.centeredRight.chr31 {
+    left: -825px;
+}
+
+/* Sekibanki */
+img.centeredLeft.chr32 {
+    left: -425px;
+}
+
+img.centeredRight.chr32 {
+    left: -775px;
+}
+
+/* Satori */
+img.centeredLeft.chr33 {
+    left: -475px;
+}
+
+img.centeredRight.chr33 {
+    left: -725px;
+}
+
+/* Ran */
+img.centeredLeft.chr34 {
+    left: -425px;
+}
+
+img.centeredRight.chr34 {
+    left: -775px;
+}
+
+/* Tewi */
+img.centeredLeft.chr35 {
+    left: -325px;
+    bottom: 0;
+}
+
+img.centeredRight.chr35 {
+    left: -875px;
+    bottom: 0;
+}
+
+/* Default */
+img.centeredLeft {
+    left: -400px;
+    bottom: 100px;
+}
+
+img.centeredRight {
+    left: -800px;
+    bottom: 100px;
+}

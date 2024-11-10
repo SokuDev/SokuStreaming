@@ -22,7 +22,11 @@ std::string convertShiftJisToUTF8(const char *str)
 			arrayOffset = bytes[indexInput]; //this is one byte shiftjis
 
 		//unicode number is...
-		uint16_t unicodeValue = convTable.at(arrayOffset);
+		uint16_t unicodeValue = 0xFFFD;
+
+		try {
+			unicodeValue = convTable.at(arrayOffset);
+		} catch (...) {}
 
 		//converting to UTF8
 		if (unicodeValue < 0x80) {

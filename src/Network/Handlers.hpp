@@ -7,6 +7,7 @@
 
 
 #include "WebServer.hpp"
+#include "package.hpp"
 
 enum Opcodes {
 	STATE_UPDATE,   // 0
@@ -25,6 +26,7 @@ Socket::HttpResponse root(const Socket::HttpRequest &requ);
 Socket::HttpResponse state(const Socket::HttpRequest &requ);
 Socket::HttpResponse getCharName(const Socket::HttpRequest &requ);
 Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ);
+Socket::HttpResponse loadSkillSheet(const Socket::HttpRequest &requ);
 Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ);
 void onNewWebSocket(WebSocket &s);
 void sendOpcode(WebSocket &s, Opcodes op, const std::string &data);
@@ -32,5 +34,7 @@ void broadcastOpcode(Opcodes op, const std::string &data);
 
 extern char profilePath[1024 + MAX_PATH];
 extern char parentPath[1024 + MAX_PATH];
+extern wchar_t soku2Path[1024 + MAX_PATH];
+extern ShadyCore::PackageEx *package;
 
 #endif //SWRSTOYS_HANDLERS_HPP

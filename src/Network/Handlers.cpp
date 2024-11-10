@@ -4,12 +4,10 @@
 
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include <fstream>
 #include "Handlers.hpp"
 #include "../State.hpp"
 #include "../Exceptions.hpp"
-#include "package.hpp"
-
-extern ShadyCore::PackageEx package;
 
 Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ)
 {
@@ -75,7 +73,7 @@ Socket::HttpResponse root(const Socket::HttpRequest &requ)
 	if (!*buffer)
 		throw AbortConnectionException(404);
 	response.header["Location"] = buffer;
-	response.returnCode = 301;
+	response.returnCode = 302;
 	return response;
 }
 
@@ -85,10 +83,10 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 		throw AbortConnectionException(501);
 
 	auto path = requ.path.substr(strlen("/internal/"));
-	auto it = package.find(path);
+	auto it = package->find(path);
 	Socket::HttpResponse response;
 
-	if (it == package.end())
+	if (it == package->end())
 		throw AbortConnectionException(404);
 
 	auto &stream = it.open();
@@ -125,6 +123,7 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 	it.close(stream);
 	response.body = body.str();
 	response.returnCode = 200;
+	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
 	return response;
 }
 
@@ -135,6 +134,31 @@ Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
 
 	response.body = name;
 	response.returnCode = 200;
+	return response;
+}
+
+Socket::HttpResponse loadSkillSheet(const Socket::HttpRequest &requ)
+{
+	auto id = std::stoul(requ.path.substr(strlen("/skillSheet/")));
+	auto name = SokuLib::getCharName(id);
+	Socket::HttpResponse response;
+	std::filesystem::path path;
+
+	if (id < 20)
+		path = std::filesystem::path(parentPath) / "skillSheets" / (name + std::string("Skills.png"));
+	else
+		path = std::filesystem::path(soku2Path) / "sheets" / (name + std::string("Skills.png"));
+
+	std::ifstream stream{path, std::ifstream::binary};
+
+	puts(path.string().c_str());
+	if (stream.fail())
+		throw AbortConnectionException(404);
+
+	response.returnCode = 200;
+	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
+	response.header["Content-Type"] = "image/png";
+	response.body = {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
 	return response;
 }
 

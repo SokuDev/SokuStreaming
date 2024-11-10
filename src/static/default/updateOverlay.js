@@ -1,25 +1,4 @@
-let sokuCharacters = [
-    {"name": 'reimu',     "skillPrefix": "Ha", "skills": [236, 214, 421, 623]},
-    {"name": 'marisa',    "skillPrefix": "Ma", "skills": [214, 623, 22,  236]},
-    {"name": 'sakuya',    "skillPrefix": "Iz", "skills": [623, 214, 236, 22 ]},
-    {"name": 'alice',     "skillPrefix": "Al", "skills": [236, 623, 214, 22 ]},
-    {"name": 'patchouli', "skillPrefix": "Pa", "skills": [236, 22,  623, 214, 421]},
-    {"name": 'youmu',     "skillPrefix": "Yo", "skills": [236, 623, 214, 22 ]},
-    {"name": 'remilia',   "skillPrefix": "Re", "skills": [236, 214, 623, 22 ]},
-    {"name": 'yuyuko',    "skillPrefix": "Ji", "skills": [214, 236, 421, 623]},
-    {"name": 'yukari',    "skillPrefix": "Yu", "skills": [236, 623, 214, 421]},
-    {"name": 'suika',     "skillPrefix": "Ib", "skills": [236, 623, 214, 22 ]},
-    {"name": 'reisen',    "skillPrefix": "Ud", "skills": [236, 214, 623, 22 ]},
-    {"name": 'aya',       "skillPrefix": "Ay", "skills": [236, 214, 22,  421]},
-    {"name": 'komachi',   "skillPrefix": "Ko", "skills": [236, 623, 22,  214]},
-    {"name": 'iku',       "skillPrefix": "Ik", "skills": [236, 623, 22,  214]},
-    {"name": 'tenshi',    "skillPrefix": "Te", "skills": [214, 22,  236, 623]},
-    {"name": 'sanae',     "skillPrefix": "Sa", "skills": [236, 22,  623, 214]},
-    {"name": 'cirno',     "skillPrefix": "Ci", "skills": [236, 214, 22,  623]},
-    {"name": 'meiling',   "skillPrefix": "Me", "skills": [214, 623, 22,  236]},
-    {"name": 'utsuho',    "skillPrefix": "Ut", "skills": [623, 236, 22,  214]},
-    {"name": 'suwako',    "skillPrefix": "Sw", "skills": [214, 623, 236, 22 ]},
-];
+let sokuCharacters = [];
 let global_state = null;
 let json = {};
 let Opcodes = {
@@ -41,34 +20,51 @@ function pad(n, width, z) {
     return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
 }
 
-function getCharacterImage(id)
+async function checkCharacter(id)
 {
-    return "/static/img/characters/" + sokuCharacters[id].name + ".png"
+    if (sokuCharacters[id] !== undefined)
+        return;
+    sokuCharacters[id] = await (await fetch("/charName/" + id)).text();
 }
 
-function getCardImage(charId, cardId)
+async function getCharacterImage(id)
 {
+    await checkCharacter(id);
+    return "/internal/data/stand/" + sokuCharacters[id] + ".png"
+}
+
+async function getCardImage(charId, cardId)
+{
+    if (cardId === 21)
+        return "/internal/data/infoeffect/cardFaceDown.png"
     if (cardId < 100)
-        return "/static/img/cards/system/Soku_common_card" + pad(cardId, 3) + ".png";
+        return "/internal/data/card/common/card" + pad(cardId, 3) + ".png";
 
-    let cardType;
-    let chr = sokuCharacters[charId];
-
-    if (cardId < 200) {
-        let id = cardId - 100;
-
-        cardType = chr.skills[id % chr.skills.length] + "bc" + Math.floor(id / chr.skills.length + 1);
-    } else
-        cardType = "sc" + pad(cardId - 200, 2);
-    return "/static/img/cards/" + chr.name + "/" + chr.skillPrefix + cardType + ".png"
+    await checkCharacter(charId);
+    return "/internal/data/card/" + sokuCharacters[charId] + "/card" + pad(cardId, 3) + ".png";
 }
 
-function getStatsImage(charId, statId)
+function getSkillImage(charId, skillId)
 {
-    let chr = sokuCharacters[charId];
-    let cardType = chr.skills[statId % chr.skills.length] + "bc" + Math.floor(statId / chr.skills.length + 1);
+    const imgTag = document.createElement("img");
 
-    return "/static/img/stats/" + chr.name + "/" + chr.skillPrefix + cardType + ".png"
+    return new Promise((resolve, reject) => {
+        imgTag.onload = () => {
+            const canvasElement = document.createElement("canvas");
+            const ctx = canvasElement.getContext("2d");
+
+            canvasElement.width = 32;
+            canvasElement.height = 32;
+
+            let imgX = skillId * 32;
+            let imgY = 0;
+
+            ctx.drawImage(imgTag, imgX, imgY, 32, 32, 0, 0, canvasElement.width, canvasElement.height);
+            resolve(canvasElement.toDataURL());
+        };
+        imgTag.onerror = () => resolve("/");
+        imgTag.setAttribute("src", '/skillSheet/' + charId);
+    })
 }
 
 function updateStat(charId, id, stats, stat)
@@ -81,43 +77,43 @@ function updateStat(charId, id, stats, stat)
         return;
     }
     div.style.height = "";
-    document.getElementById(id + stat + "lvl").setAttribute("src", "/static/img/stats/LEVEL00" + nb + ".png");
+    document.getElementById(id + stat + "lvl").setAttribute("src", "/static/img/LEVEL00" + nb + ".png");
 }
 
-function displayStats(charId, id, stats)
+async function displayStats(charId, id, stats)
 {
-    let chr = sokuCharacters[charId];
-
     updateStat(charId, id, stats, "rod");
     updateStat(charId, id, stats, "doll");
     updateStat(charId, id, stats, "fan");
     updateStat(charId, id, stats, "grimoire");
     updateStat(charId, id, stats, "drops");
-    for (let i = chr.skills.length; i < 5; i++) {
+
+    let entries = Object.entries(stats["skills"]);
+
+    for (let i = entries.length; i < 5; i++)
         document.getElementById(id + "skill" + i).style.height = "0";
-    }
-    for (const [key, value] of Object.entries(stats["skills"])) {
-        let div = document.getElementById(id + "skill" + (key % chr.skills.length));
-        let icon = document.getElementById(id + "skill" + (key % chr.skills.length) + "icon");
-        let level = document.getElementById(id + "skill" + (key % chr.skills.length) + "lvl");
+    for (const [key, value] of entries) {
+        let div = document.getElementById(id + "skill" + (key % entries.length));
+        let icon = document.getElementById(id + "skill" + (key % entries.length) + "icon");
+        let level = document.getElementById(id + "skill" + (key % entries.length) + "lvl");
 
         if (value) {
             div.style.height = "";
-            icon.setAttribute("src", getStatsImage(charId, key));
-            level.setAttribute("src", "/static/img/stats/LEVEL00" + value + ".png");
-        } else {
+            icon.setAttribute("src", await getSkillImage(charId, key));
+            level.setAttribute("src", "/static/img/LEVEL00" + value + ".png");
+        } else if (div) {
             div.style.height = "0";
         }
     }
 }
 
-function displayDeck(id, used, hand, deck, chr)
+async function displayDeck(id, used, hand, deck, chr)
 {
     let i = 0;
 
     for (let g = 0; i < 20 && g < hand.length; i++) {
         let img = document.getElementById(id + i);
-        let src = getCardImage(chr, hand[g]);
+        let src = await getCardImage(chr, hand[g]);
 
         img.setAttribute("src", src);
         img.className = "hand_card";
@@ -125,7 +121,7 @@ function displayDeck(id, used, hand, deck, chr)
     }
     for (let g = 0; i < 20 && g < deck.length; i++) {
         let img = document.getElementById(id + i);
-        let src = getCardImage(chr, deck[g]);
+        let src = await getCardImage(chr, deck[g]);
 
         img.setAttribute("src", src);
         img.className = "card";
@@ -133,7 +129,7 @@ function displayDeck(id, used, hand, deck, chr)
     }
     for (let g = 0; i < 20 && g < used.length; i++) {
         let img = document.getElementById(id + i);
-        let src = getCardImage(chr, used[g]);
+        let src = await getCardImage(chr, used[g]);
 
         img.setAttribute("src", src);
         img.className = "used_card";
@@ -151,17 +147,11 @@ function checkState()
     if (global_state)
         return true;
 
-    const Http = new XMLHttpRequest();
-    const url = '/state';
-
-    console.warn("State is not initialized...");
-    Http.open("GET", url);
-    Http.send();
-    Http.onload = update
+    fetch('/state').then(r => r.json.then(update));
     return false;
 }
 
-function update(state)
+async function update(state)
 {
     global_state = state;
 
@@ -169,29 +159,52 @@ function update(state)
     let rchr = state.right.character;
     let round = document.getElementById("roundMarker");
 
-    document.getElementById("lChr").setAttribute("src", getCharacterImage(lchr));
-    document.getElementById("rChr").setAttribute("src", getCharacterImage(rchr));
-    document.getElementById("leftName").textContent = state.left.name;
-    document.getElementById("rightName").textContent = state.right.name;
-    document.getElementById("leftScore").textContent = state.left.score + "";
-    document.getElementById("rightScore").textContent = state.right.score + "";
+    lChr.setAttribute("src", await getCharacterImage(lchr));
+    for (let c of lChr.classList)
+        if (/chr\d+/.test(c))
+            lChr.classList.remove(c);
+    lChr.classList.add("chr" + lchr);
+    rChr.setAttribute("src", await getCharacterImage(rchr));
+    for (let c of rChr.classList)
+        if (/chr\d+/.test(c))
+            rChr.classList.remove(c);
+    rChr.classList.add("chr" + rchr);
+    leftName.textContent = state.left.name;
+    rightName.textContent = state.right.name;
+    leftScore.textContent = state.left.score + "";
+    rightScore.textContent = state.right.score + "";
 
     if (round)
         round.textContent = state.round;
 
-    displayDeck("lCard", state.left.used,  state.left.hand,  state.left.deck,  lchr);
-    displayDeck("rCard", state.right.used, state.right.hand, state.right.deck, rchr);
+    await displayDeck("lCard", state.left.used,  state.left.hand,  state.left.deck,  lchr);
+    await displayDeck("rCard", state.right.used, state.right.hand, state.right.deck, rchr);
     displayStats(lchr, "l", state.left.stats);
     displayStats(rchr, "r", state.right.stats);
 }
 
-function updateDecks(decks)
+async function setPortraits(i) {
+    let url = "/internal/data/stand/" + (await (await fetch('/charName/' + i)).text()) + ".png";
+
+    lChr.setAttribute("src", await getCharacterImage(i));
+    for (let c of lChr.classList)
+        if (/chr\d+/.test(c))
+            lChr.classList.remove(c);
+    lChr.classList.add("chr" + i);
+    rChr.setAttribute("src", await getCharacterImage(i));
+    for (let c of rChr.classList)
+        if (/chr\d+/.test(c))
+            rChr.classList.remove(c);
+    rChr.classList.add("chr" + i);
+}
+
+async function updateDecks(decks)
 {
     if (!checkState())
         return;
 
-    displayDeck("lCard", decks.left.used,  decks.left.hand,  decks.left.deck,  global_state.left.character);
-    displayDeck("rCard", decks.right.used, decks.right.hand, decks.right.deck, global_state.right.character);
+    await displayDeck("lCard", decks.left.used,  decks.left.hand,  decks.left.deck,  global_state.left.character);
+    await displayDeck("rCard", decks.right.used, decks.right.hand, decks.right.deck, global_state.right.character);
 
     global_state.left.deck  = decks.left.deck;
     global_state.left.used  = decks.left.used;
@@ -204,7 +217,7 @@ function updateDecks(decks)
 function updateLeftScore(newScore) {
     if (!checkState())
         return;
-    document.getElementById("leftScore").textContent = newScore + "";
+    leftScore.textContent = newScore + "";
     global_state.left.score = newScore;
 }
 
@@ -212,7 +225,7 @@ function updateRightScore(newScore)
 {
     if (!checkState())
         return;
-    document.getElementById("rightScore").textContent = newScore + "";
+    rightScore.textContent = newScore + "";
     global_state.right.score = newScore;
 }
 
@@ -256,7 +269,7 @@ function updateLeftName(newName)
 {
     if (!checkState())
         return;
-    document.getElementById("leftName").textContent = newName;
+    leftName.textContent = newName;
     global_state.left.name = newName;
 }
 
@@ -264,7 +277,7 @@ function updateRightName(newName)
 {
     if (!checkState())
         return;
-    document.getElementById("rightName").textContent = newName;
+    rightName.textContent = newName;
     global_state.right.name = newName;
 }
 
