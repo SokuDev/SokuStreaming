@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <Shlwapi.h>
 #include <dinput.h>
+#include <sstream>
+#include <fstream>
 #include "Utils/InputBox.hpp"
 #include "Exceptions.hpp"
 #include "Network/Handlers.hpp"
@@ -19,11 +21,11 @@ namespace ShadyCore {
 	void Deallocate(void* p) { SokuLib::DeleteFct(p); }
 }
 
-ShadyCore::PackageEx *package = nullptr;
-
 wchar_t soku2Path[1024 + MAX_PATH];
 char profilePath[1024 + MAX_PATH];
 char parentPath[1024 + MAX_PATH];
+// Vanilla characters
+std::vector<unsigned> availableCharacters = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
 
 int __fastcall CTitle_OnProcess(Title *This) {
 	// super
@@ -98,6 +100,38 @@ int __fastcall CBattleManager_Render(SokuLib::BattleManager *This) {
 	return ret;
 }
 
+void loadSoku2CSV(LPWSTR path)
+{
+	std::ifstream stream{path};
+	std::string line;
+
+	printf("Loading character CSV from %S\n", path);
+	if (stream.fail()) {
+		printf("%S: %s\n", path, strerror(errno));
+		return;
+	}
+	while (std::getline(stream, line)) {
+		std::stringstream str{line};
+		unsigned id;
+		std::string idStr;
+		std::string stuff;
+
+		std::getline(str, idStr, ';');
+		std::getline(str, stuff, '\n');
+		if (str.fail()) {
+			printf("Skipping line %s: Stream failed\n", line.c_str());
+			continue;
+		}
+		try {
+			id = std::stoi(idStr);
+		} catch (...){
+			printf("Skipping line %s: Invalid id\n", line.c_str());
+			continue;
+		}
+		availableCharacters.push_back(id);
+	}
+}
+
 void loadSoku2Config()
 {
 	puts("Looking for Soku2 config...");
@@ -151,6 +185,8 @@ void loadSoku2Config()
 		printf("Found Soku2 module folder at %S\n", module_path);
 		PathAppendW(module_path, L"\\config\\info");
 		wcscpy(soku2Path, module_path);
+		PathAppendW(module_path, L"characters.csv");
+		loadSoku2CSV(module_path);
 		return;
 	}
 }
@@ -189,27 +225,6 @@ void LoadSettings()
 	webServer->addStaticFolder("/static", std::string(parentPath) + "/static");
 	webServer->start(port);
 	webServer->onWebSocketConnect(onNewWebSocket);
-}
-
-void __fastcall buildDatList(const char *path)
-{
-	auto old = package;
-
-	package = new ShadyCore::PackageEx();
-	package->merge(new ShadyCore::Package(path));
-	if (old)
-		package->merge(old);
-}
-
-void __declspec(naked) buildDatList_hook()
-{
-	__asm {
-		PUSH ECX
-		MOV ECX, [ESP + 12]
-		CALL buildDatList
-		POP ECX
-		RET
-	}
 }
 
 void hookFunctions()
@@ -267,8 +282,6 @@ void hookFunctions()
 	);*/
 	::VirtualProtect((PVOID)RDATA_SECTION_OFFSET, RDATA_SECTION_SIZE, old, &old);
 	::VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, PAGE_EXECUTE_WRITECOPY, &old);
-	SokuLib::TamperNearCall(0x40D1D4, buildDatList_hook);
-	SokuLib::TamperNearJmp(0x40D1D9, 0x41BB50);
 	::VirtualProtect((PVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);
 	::FlushInstructionCache(GetCurrentProcess(), NULL, 0);
 }

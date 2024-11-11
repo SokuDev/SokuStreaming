@@ -77,61 +77,131 @@ Socket::HttpResponse root(const Socket::HttpRequest &requ)
 	return response;
 }
 
+const std::vector<std::string> convertedFormats{"txt", "csv", "lbl", "png", "bmp", "act", "wav", "xml"};
+const std::map<std::string, std::string> gameMimeTypes{
+	// Game format
+	{ "cv0", "application/octet-stream" }, // TYPE_TEXT,    TEXT_GAME
+	{ "cv1", "application/octet-stream" }, // TYPE_TABLE,   TABLE_GAME
+	{ "sfl", "application/octet-stream" }, // TYPE_LABEL,   LABEL_RIFF
+	{ "cv2", "application/octet-stream" }, // TYPE_IMAGE,   IMAGE_GAME
+	{ "pal", "application/octet-stream" }, // TYPE_PALETTE, PALETTE_PAL
+	{ "cv3", "application/octet-stream" }, // TYPE_SFX,     SFX_GAME
+	{ "ogg", "audio/ogg" },                // TYPE_BGM,     BGM_OGG
+	{ "dds", "application/octet-stream" }, // TYPE_TEXTURE, TEXTURE_DDS
+	{ "dat", "application/octet-stream" }, // TYPE_SCHEMA,  SCHEMA_GAME_GUI
+	{ "pat", "application/octet-stream" }, // TYPE_SCHEMA,  SCHEMA_GAME_PATTERN | SCHEMA_GAME_ANIM
+
+	// Standard format
+	{ "txt", "text/plain" },               // TYPE_TEXT,    TEXT_NORMAL
+	{ "csv", "text/plain" },               // TYPE_TABLE,   TABLE_CSV
+	{ "lbl", "text/plain" },               // TYPE_LABEL,   LABEL_LBL
+	{ "png", "image/png" },                // TYPE_IMAGE,   IMAGE_PNG
+	{ "bmp", "image/bmp" },                // TYPE_IMAGE,   IMAGE_BMP
+	{ "act", "application/octet-stream" }, // TYPE_PALETTE, PALETTE_ACT
+	{ "wav", "audio/wav" },                // TYPE_SFX,     SFX_WAV
+	{ "xml", "application/xml" },          // TYPE_SCHEMA,  SCHEMA_XML
+};
+const std::map<std::string, std::string> gameFormatExtensions{
+	// Standard format
+	{ "txt", "cv0" },
+	{ "csv", "cv1" },
+	{ "lbl", "sfl" },
+	{ "png", "cv2" },
+	{ "bmp", "cv2" },
+	{ "act", "pal" },
+	{ "wav", "cv3" },
+	{ "xml", "pat" }
+};
+const std::map<std::string, ShadyCore::FileType> gameFileTypes{
+	{ "txt", {ShadyCore::FileType::TYPE_TEXT,    ShadyCore::FileType::TEXT_NORMAL} },
+	{ "csv", {ShadyCore::FileType::TYPE_TABLE,   ShadyCore::FileType::TABLE_CSV} },
+	{ "lbl", {ShadyCore::FileType::TYPE_LABEL,   ShadyCore::FileType::LABEL_LBL} },
+	{ "png", {ShadyCore::FileType::TYPE_IMAGE,   ShadyCore::FileType::IMAGE_PNG} },
+	{ "bmp", {ShadyCore::FileType::TYPE_IMAGE,   ShadyCore::FileType::IMAGE_BMP} },
+	{ "act", {ShadyCore::FileType::TYPE_PALETTE, ShadyCore::FileType::PALETTE_ACT} },
+	{ "wav", {ShadyCore::FileType::TYPE_SFX,     ShadyCore::FileType::SFX_WAV} },
+	{ "xml", {ShadyCore::FileType::TYPE_SCHEMA,  ShadyCore::FileType::SCHEMA_XML} },
+};
+
 Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 {
-	if (requ.path == "/internal")
+	if (requ.realPath == "/internal")
 		throw AbortConnectionException(501);
 
-	auto path = requ.path.substr(strlen("/internal/"));
-	auto it = package->find(path);
-	Socket::HttpResponse response;
+	auto path = requ.realPath.substr(strlen("/internal/"));
+	auto pos = path.find_last_of('.');
 
-	if (it == package->end())
+	if (pos == std::string::npos)
 		throw AbortConnectionException(404);
 
-	auto &stream = it.open();
-	std::stringstream body;
+	auto ext = path.substr(pos + 1);
+	SokuLib::PackageReader reader;
+	Socket::HttpResponse response;
+	char *buffer;
+	auto it = gameFormatExtensions.find(ext);
 
-	switch (it->first.fileType.type) {
-	case ShadyCore::FileType::TYPE_UNKNOWN:
-		break;
-	case ShadyCore::FileType::TYPE_TEXT:
-		break;
-	case ShadyCore::FileType::TYPE_TABLE:
-		break;
-	case ShadyCore::FileType::TYPE_LABEL:
-		break;
-	case ShadyCore::FileType::TYPE_IMAGE: {
-		ShadyCore::Image image;
+	if (it != gameFormatExtensions.end())
+		path = path.substr(0, pos + 1) + it->second;
 
-		response.header["content-type"] = "image/png";
-		ShadyCore::getResourceReader(it.fileType())(&image, stream);
-		ShadyCore::getResourceWriter({ShadyCore::FileType::TYPE_IMAGE, ShadyCore::FileType::IMAGE_PNG})(&image, body);
-		break;
+	reader.open(path.c_str());
+	if (!reader.isOpen() && ext == "xml") {
+		path = path.substr(0, pos + 1) + "dat";
+		reader.open(path.c_str());
 	}
-	case ShadyCore::FileType::TYPE_PALETTE:
-		break;
-	case ShadyCore::FileType::TYPE_SFX:
-		break;
-	case ShadyCore::FileType::TYPE_BGM:
-		break;
-	case ShadyCore::FileType::TYPE_SCHEMA:
-		break;
-	case ShadyCore::FileType::TYPE_TEXTURE:
-		break;
+	if (!reader.isOpen())
+		throw AbortConnectionException(404);
+	buffer = new char[reader.GetLength()];
+	reader.Read(buffer, reader.GetLength());
+	reader.close();
+
+	response.body = std::string{buffer, buffer + reader.GetLength()};
+	if (std::find(convertedFormats.begin(), convertedFormats.end(), ext) != convertedFormats.end()) {
+		std::stringstream input;
+		std::stringstream body;
+		bool notImplemented = false;
+		auto fileType = gameFileTypes.at(ext);
+
+		input.str(response.body);
+		switch (fileType.type) {
+		case ShadyCore::FileType::TYPE_IMAGE: {
+			ShadyCore::Image image;
+
+			ShadyCore::getResourceReader({ShadyCore::FileType::TYPE_IMAGE, ShadyCore::FileType::IMAGE_GAME})(&image, input);
+			if (image.bitsPerPixel == 8 && requ.query.find("palette") != requ.query.end())
+				throw AbortConnectionException(501);
+			ShadyCore::getResourceWriter(fileType)(&image, body);
+			break;
+		}
+		case ShadyCore::FileType::TYPE_TEXT:
+		case ShadyCore::FileType::TYPE_TABLE:
+		case ShadyCore::FileType::TYPE_LABEL:
+		case ShadyCore::FileType::TYPE_PALETTE:
+		case ShadyCore::FileType::TYPE_SFX:
+		case ShadyCore::FileType::TYPE_BGM:
+		case ShadyCore::FileType::TYPE_SCHEMA:
+		case ShadyCore::FileType::TYPE_TEXTURE:
+			throw AbortConnectionException(501);
+		}
+		response.body = body.str();
 	}
-	it.close(stream);
-	response.body = body.str();
 	response.returnCode = 200;
+	response.header["Content-Type"] = gameMimeTypes.at(ext);
 	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
 	return response;
 }
 
 Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
 {
-	auto name = SokuLib::getCharName(std::stoul(requ.path.substr(strlen("/charName/"))));
+	auto id = std::stoul(requ.realPath.substr(strlen("/charName/")));
+
+	if (std::find(availableCharacters.begin(), availableCharacters.end(), id) == availableCharacters.end())
+		throw AbortConnectionException(404);
+
+	auto name = SokuLib::getCharName(id);
 	Socket::HttpResponse response;
 
+	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
+	response.header["Content-Type"] = "text/plain";
 	response.body = name;
 	response.returnCode = 200;
 	return response;
@@ -139,7 +209,11 @@ Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
 
 Socket::HttpResponse loadSkillSheet(const Socket::HttpRequest &requ)
 {
-	auto id = std::stoul(requ.path.substr(strlen("/skillSheet/")));
+	auto id = std::stoul(requ.realPath.substr(strlen("/skillSheet/")));
+
+	if (std::find(availableCharacters.begin(), availableCharacters.end(), id) == availableCharacters.end())
+		throw AbortConnectionException(404);
+
 	auto name = SokuLib::getCharName(id);
 	Socket::HttpResponse response;
 	std::filesystem::path path;

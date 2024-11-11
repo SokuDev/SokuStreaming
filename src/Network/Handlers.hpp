@@ -35,6 +35,6 @@ void broadcastOpcode(Opcodes op, const std::string &data);
 extern char profilePath[1024 + MAX_PATH];
 extern char parentPath[1024 + MAX_PATH];
 extern wchar_t soku2Path[1024 + MAX_PATH];
-extern ShadyCore::PackageEx *package;
+extern std::vector<unsigned> availableCharacters;
 
 #endif //SWRSTOYS_HANDLERS_HPP

@@ -30,6 +30,8 @@ public:
 		int portno; //!< The port number to contact the host
 		std::map<std::string, std::string> header; //!< The header of the request (entry: value)
 		std::string path; //!< The url to fetch
+		std::map<std::string, std::string> query;
+		std::string realPath;
 	};
 
 	//! @brief Define a http response payload.

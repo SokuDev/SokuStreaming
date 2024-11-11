@@ -165,11 +165,12 @@ void WebServer::_serverLoop()
 			requ.portno = newConnection.getRemote().sin_port;
 			if (requ.httpVer != "HTTP/1.1")
 				throw AbortConnectionException(505);
-			if (requ.path == "/chat")
+			WebServer::_parsePath(requ);
+			if (requ.realPath == "/chat")
 				return this->_addWebSocket(newConnection, requ);
 			else {
 				auto it = std::find_if(this->_routes.begin(), this->_routes.end(), [&requ](auto &pair){
-					return std::regex_match(requ.path, std::regex{pair.first});
+					return std::regex_match(requ.realPath, std::regex{pair.first});
 				});
 
 				response.request = requ;
@@ -259,11 +260,16 @@ Socket::HttpResponse WebServer::_checkFolders(const Socket::HttpRequest &request
 
 	if (request.method != "GET")
 		throw AbortConnectionException(405);
-	//TODO: Fix vulnerability if using .. in URL
 	for (auto &folder : this->_folders) {
-		if (request.path.substr(0, folder.first.length()) == folder.first) {
-			std::string realPath = folder.second + request.path.substr(folder.first.length());
-			std::string type = WebServer::_getContentType(request.path);
+		if (request.realPath.substr(0, folder.first.length()) == folder.first) {
+			auto url = request.realPath.substr(folder.first.length());
+
+			// TODO: Handle this case better
+			if (url.find("/../") != std::string::npos)
+				throw AbortConnectionException(401);
+
+			std::string realPath = folder.second + url;
+			std::string type = WebServer::_getContentType(request.realPath);
 			int i = std::ifstream::in;
 
 			if (type.substr(0, 5) != "text/")
@@ -370,4 +376,56 @@ void WebServer::onWebSocketMessage(const std::function<void(WebSocket &, const s
 void WebServer::onWebSocketError(const std::function<void(WebSocket &, const std::exception &)> & fct)
 {
 	this->_onError = fct;
+}
+
+void WebServer::_parsePath(Socket::HttpRequest &req)
+{
+	auto pos = req.path.find_first_of('?');
+
+	req.realPath = WebServer::_decodeURIComponent(req.path.substr(0, pos));
+	if (pos != std::string::npos) {
+		std::string queryString = req.path.substr(pos + 1);
+
+		while (true) {
+			size_t equ = queryString.find_first_of('=');
+			std::string key = queryString.substr(0, equ);
+			size_t end = queryString.find('&');
+
+			if (equ != std::string::npos)
+				req.query[key] = queryString.substr(equ + 1);
+			else if (!queryString.empty() && end != 0)
+				req.query[key] = "";
+			if (end == std::string::npos)
+				break;
+			queryString = queryString.substr(end + 1);
+		}
+	}
+}
+
+std::string WebServer::_decodeURIComponent(const std::string &elem)
+{
+	std::string result;
+	char digits[] = "0123456789ABCDEF";
+
+	result.reserve(elem.size());
+	for (size_t i = 0; i < elem.size(); i++) {
+		if (elem[i] < ' ' || elem[i] > 126)
+			throw AbortConnectionException(400);
+		if (elem[i] == '+')
+			result.push_back(' ');
+		else if (elem[i] == '%') {
+			if (elem.size() < 3 || i + 2 >= elem.size())
+				throw AbortConnectionException(400);
+
+			auto ptr1 = strchr(digits, toupper(elem[i + 1]));
+			auto ptr2 = strchr(digits, toupper(elem[i + 2]));
+
+			if (!ptr1 || !ptr2)
+				throw AbortConnectionException(400);
+			result.push_back(((ptr1 - digits) << 4) | (ptr2 - digits));
+			i += 2;
+		} else
+			result.push_back(elem[i]);
+	}
+	return result;
 }

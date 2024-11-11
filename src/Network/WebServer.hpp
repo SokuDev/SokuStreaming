@@ -41,6 +41,8 @@ private:
 	static std::string _getContentType(const std::string &path);
 	static Socket::HttpResponse _makeGenericPage(unsigned short code);
 	static Socket::HttpResponse _makeGenericPage(unsigned short code, const std::string &extra);
+	static void _parsePath(Socket::HttpRequest &req);
+	static std::string _decodeURIComponent(const std::string &elem);
 
 public:
 	static const std::map<std::string, std::string> types;
