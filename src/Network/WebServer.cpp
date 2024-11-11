@@ -6,8 +6,10 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
+#include <filesystem>
 #include "WebServer.hpp"
 #include "../Exceptions.hpp"
+#include "nlohmann/json.hpp"
 
 const std::map<std::string, std::string> WebServer::types{
 	{"txt", "text/plain"},
@@ -102,12 +104,14 @@ WebServer::WebServer(int staticAge) :
 
 void WebServer::addRoute(const std::string &&route, std::function<Socket::HttpResponse(const Socket::HttpRequest &)> &&fct)
 {
+	std::cout << "Adding route " << route << std::endl;
 	this->_routes[route] = fct;
 }
 
-void WebServer::addStaticFolder(const std::string &&route, const std::string &&path)
+void WebServer::addStaticFolder(const std::string &&route, const std::string &&path, bool discoverable)
 {
-	this->_folders[route] = path;
+	std::cout << "Adding static folder " << route << " -> " << path << std::endl;
+	this->_folders[route] = {path, discoverable};
 }
 
 void WebServer::start(unsigned short port)
@@ -173,6 +177,7 @@ void WebServer::_serverLoop()
 					return std::regex_match(requ.realPath, std::regex{pair.first});
 				});
 
+				std::cout << requ.realPath << std::endl;
 				response.request = requ;
 				if (it != this->_routes.end())
 					response = it->second(requ);
@@ -189,7 +194,13 @@ void WebServer::_serverLoop()
 		} catch (EOFException &) {
 			response = WebServer::_makeGenericPage(408);
 		} catch (AbortConnectionException &e) {
-			response = WebServer::_makeGenericPage(e.getCode());
+			if (*e.getBody()) {
+				response.returnCode = e.getCode();
+				response.codeName = WebServer::codes.at(response.returnCode);
+				response.header["content-type"] = e.getType();
+				response.body = e.getBody();
+			} else
+				response = WebServer::_makeGenericPage(e.getCode());
 		}
 		response.codeName = WebServer::codes.at(response.returnCode);
 		response.header["Connection"] = "Close";
@@ -260,15 +271,26 @@ Socket::HttpResponse WebServer::_checkFolders(const Socket::HttpRequest &request
 
 	if (request.method != "GET")
 		throw AbortConnectionException(405);
-	for (auto &folder : this->_folders) {
-		if (request.realPath.substr(0, folder.first.length()) == folder.first) {
-			auto url = request.realPath.substr(folder.first.length());
+	for (auto &[key, folder] : this->_folders) {
+		if (request.realPath.size() < key.length())
+			continue;
+		if (request.realPath.size() == key.length() && request.realPath != key)
+			continue;
+		if (request.realPath.size() > key.length() && (
+			request.realPath.substr(0, key.length()) != key ||
+			request.realPath[key.size()] != '/'
+		))
+			continue;
 
-			// TODO: Handle this case better
-			if (url.find("/../") != std::string::npos)
-				throw AbortConnectionException(401);
+		auto url = request.realPath.substr(key.length());
 
-			std::string realPath = folder.second + url;
+		// TODO: Handle this case better
+		if (url.find("/../") != std::string::npos)
+			throw AbortConnectionException(401);
+
+		std::string realPath = folder.first + url;
+
+		if (realPath.empty() || realPath.back() != '/' || !folder.second) {
 			std::string type = WebServer::_getContentType(request.realPath);
 			int i = std::ifstream::in;
 
@@ -283,6 +305,57 @@ Socket::HttpResponse WebServer::_checkFolders(const Socket::HttpRequest &request
 			response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(this->_staticAge);
 			response.header["Content-Type"] = type;
 			response.body = {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+			return response;
+		} else {
+			std::error_code err;
+			std::filesystem::directory_iterator it{realPath, err};
+
+			if (err)
+				throw AbortConnectionException(404);
+
+			auto accept = request.header.find("accept");
+
+			if (accept == request.header.end() || accept->second != "application/json") {
+				response.body = "<html>"
+					"<head>"
+						"<title>Index of " + url + "</title>"
+					"</head>"
+				"<body>"
+					"<h1>Index of " + url + "</h1>"
+					"<hr>"
+					"<pre>";
+
+				if (url != "/")
+					response.body += "&#128193 <a href=\"../\">../</a>\n";
+
+				for (auto &entry : it) {
+					auto name = entry.path().filename().string();
+
+					if (entry.is_directory())
+						response.body += "&#128193 <a href=\"" + name + "/\">" + name + "/</a>";
+					else
+						response.body += "   <a href=\"" + name + "\">" + name + "</a>";
+					response.body += "\n";
+				}
+				response.body += "</pre><hr></body></html>";
+				response.returnCode = 200;
+				response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(this->_staticAge);
+				response.header["Content-Type"] = "text/html";
+			} else {
+				nlohmann::json json = nlohmann::json::array();
+
+				for (auto &entry : it) {
+					auto name = entry.path().filename().string();
+
+					if (entry.is_directory())
+						name.push_back('/');
+					json.push_back(name);
+				}
+				response.body = json.dump();
+				response.returnCode = 200;
+				response.header["Cache-Control"] = "private, immutable, max-age=0";
+				response.header["Content-Type"] = "application/json";
+			}
 			return response;
 		}
 	}

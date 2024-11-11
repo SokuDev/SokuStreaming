@@ -9,11 +9,8 @@
 #include <SokuLib.hpp>
 #include "Network/WebServer.hpp"
 
-struct Title{};
-struct Battle{};
-struct Loading{};
-struct BattleWatch{};
-struct LoadingWatch{};
+#include "Network/WebServer.hpp"
+#include <SokuLib.hpp>
 
 enum Keys {
 	KEY_DECREASE_L_SCORE,
@@ -24,6 +21,7 @@ enum Keys {
 	KEY_CHANGE_R_NAME,
 	KEY_RESET_SCORES,
 	KEY_RESET_STATE,
+	KEY_CHANGE_ROUND,
 	TOTAL_NB_OF_KEYS
 };
 
@@ -34,13 +32,14 @@ struct Stats {
 	unsigned short fan;
 	unsigned short drops;
 	SokuLib::Skill skillMap[16];
+	unsigned int specialValue;
 };
 
-extern bool enabled;
 extern unsigned short port;
 extern std::vector<unsigned> keys;
 extern std::unique_ptr<WebServer> webServer;
 extern struct CachedMatchData {
+	bool recvScores;
 	SokuLib::Weather weather;
 	SokuLib::Character left;
 	SokuLib::Character right;
@@ -65,14 +64,14 @@ extern struct CachedMatchData {
 } _cache;
 extern bool needReset;
 extern bool needRefresh;
-extern int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_Render)();
-extern int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_Start)();
-extern int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_KO)();
-extern int (__thiscall LoadingWatch::*s_origCLoadingWatch_Process)();
-extern int (__thiscall BattleWatch::*s_origCBattleWatch_Process)();
-extern int (__thiscall Loading::*s_origCLoading_Process)();
-extern int (__thiscall Battle::*s_origCBattle_Process)();
-extern int (__thiscall Title::*s_origCTitle_Process)();
+extern int (SokuLib::BattleManager::*s_origCBattleManager_Render)();
+extern int (SokuLib::BattleManager::*s_origCBattleManager_Start)();
+extern int (SokuLib::BattleManager::*s_origCBattleManager_KO)();
+extern int (SokuLib::LoadingWatch::*s_origCLoadingWatch_Process)();
+extern int (SokuLib::BattleWatch::*s_origCBattleWatch_Process)();
+extern int (SokuLib::Loading::*s_origCLoading_Process)();
+extern int (SokuLib::Battle::*s_origCBattle_Process)();
+extern int (SokuLib::Title::*s_origCTitle_Process)();
 
 void updateCache(bool isMultiplayer);
 std::string generateLeftCardsJson(CachedMatchData cache);

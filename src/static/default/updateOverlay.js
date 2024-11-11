@@ -13,6 +13,7 @@ let Opcodes = {
     "L_STATS_UPDATE": 8,
     "R_STATS_UPDATE": 9,
 }
+let standsOverride = [];
 
 function pad(n, width, z) {
     z = z || '0';
@@ -30,6 +31,8 @@ async function checkCharacter(id)
 async function getCharacterImage(id)
 {
     await checkCharacter(id);
+    if (standsOverride.includes(sokuCharacters[id] + ".png"))
+        return "./portraitOverride/" + sokuCharacters[id] + ".png";
     return "/internal/data/stand/" + sokuCharacters[id] + ".png"
 }
 
@@ -82,16 +85,33 @@ function updateStat(charId, id, stats, stat)
 
 async function displayStats(charId, id, stats)
 {
+    let entries = Object.entries(stats["skills"]);
+    let chrs = [7, 10];
+    let images = ["butterflies", "elixir"];
+    let index = chrs.indexOf(charId)
+
+    for (let i = entries.length; i < 5; i++)
+        document.getElementById(id + "skill" + i).style.height = "0";
+    if (index >= 0) {
+        let nb = stats["special"];
+        let div = document.getElementById(id + "skill4");
+        let icon = document.getElementById(id + "skill4icon");
+        let level = document.getElementById(id + "skill4lvl");
+
+        if (nb === 0)
+            div.style.height = "0";
+        else {
+            div.style.height = "";
+            icon.setAttribute("src", "/static/img/" + images[0] + ".png");
+            level.setAttribute("src", "/static/img/LEVEL00" + nb + ".png");
+        }
+    }
+
     updateStat(charId, id, stats, "rod");
     updateStat(charId, id, stats, "doll");
     updateStat(charId, id, stats, "fan");
     updateStat(charId, id, stats, "grimoire");
     updateStat(charId, id, stats, "drops");
-
-    let entries = Object.entries(stats["skills"]);
-
-    for (let i = entries.length; i < 5; i++)
-        document.getElementById(id + "skill" + i).style.height = "0";
     for (const [key, value] of entries) {
         let div = document.getElementById(id + "skill" + (key % entries.length));
         let icon = document.getElementById(id + "skill" + (key % entries.length) + "icon");
@@ -311,7 +331,7 @@ function handleWebSocketMsg(event)
     }
 }
 
-function initWebSocket() {
+async function initWebSocket() {
     let url = "ws://" + window.location.href.split('/')[2] + "/chat";
 
     console.log("Connecting to " + url);
@@ -325,5 +345,8 @@ function initWebSocket() {
         setTimeout(initWebSocket, 10000);
     };
     sock.onerror = console.error;
+    try {
+        standsOverride = await (await fetch('./portraitOverride/', { headers: { "Accept": "application/json" }})).json();
+    } catch (err) {}
 }
 initWebSocket();

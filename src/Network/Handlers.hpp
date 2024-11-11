@@ -20,11 +20,16 @@ enum Opcodes {
 	R_NAME_UPDATE,  // 7
 	L_STATS_UPDATE, // 8
 	R_STATS_UPDATE, // 9
+	GAME_ENDED,     //10
+	GAME_STARTED,   //11
+	SESSION_ENDED,  //12
+	SESSION_STARTED,//13
 };
 
 Socket::HttpResponse root(const Socket::HttpRequest &requ);
 Socket::HttpResponse state(const Socket::HttpRequest &requ);
 Socket::HttpResponse getCharName(const Socket::HttpRequest &requ);
+Socket::HttpResponse getCharNames(const Socket::HttpRequest &requ);
 Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ);
 Socket::HttpResponse loadSkillSheet(const Socket::HttpRequest &requ);
 Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ);

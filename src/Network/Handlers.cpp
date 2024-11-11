@@ -21,18 +21,42 @@ Socket::HttpResponse connectRoute(const Socket::HttpRequest &requ)
 	std::string ip;
 	unsigned short hport;
 	bool isSpec;
+	nlohmann::json json;
+	std::map<std::string, std::string> errors;
 
 	try {
-		auto json = nlohmann::json::parse(requ.body);
-
-		ip = json["ip"];
-		hport = json["port"];
-		isSpec = json["spec"];
-		if (inet_addr(ip.c_str()) == -1)
-			throw std::exception();
-	} catch (...) {
-		throw AbortConnectionException(400);
+		json = nlohmann::json::parse(requ.body);
+	} catch (std::exception &e) {
+		throw AbortConnectionException(400, nlohmann::json{
+			{"error", "JSON parsing error"},
+			{"details", e.what()},
+			{"body", requ.body}
+		}.dump(), "application/json");
 	}
+	if (!json.contains("ip"))
+		errors["ip"] = "This field is required";
+	if (!json.contains("port"))
+		errors["port"] = "This field is required";
+	if (!json.contains("spec"))
+		errors["spec"] = "This field is required";
+
+	if (errors.begin() != errors.end())
+		throw AbortConnectionException(400, nlohmann::json{errors}.dump(), "application/json");
+
+	if (!json["ip"].is_string())
+		errors["ip"] = "String expected but got " + std::string(json["ip"].type_name());
+	if (!json["port"].is_number())
+		errors["port"] = "Number expected but got " + std::string(json["port"].type_name());
+	if (!json["spec"].is_boolean())
+		errors["spec"] = "Boolean expected but got " + std::string(json["spec"].type_name());
+	if (errors.begin() != errors.end())
+		throw AbortConnectionException(400, nlohmann::json{errors}.dump(), "application/json");
+
+	ip = json["ip"];
+	hport = json["port"];
+	isSpec = json["spec"];
+	if (inet_addr(ip.c_str()) == -1)
+		throw AbortConnectionException(400, nlohmann::json{{{"ip", "This field is invalid"}}}.dump(), "application/json");
 
 	if (!SokuLib::MenuConnect::isInNetworkMenu()) {
 		SokuLib::MenuConnect::moveToConnectMenu();
@@ -70,6 +94,7 @@ Socket::HttpResponse root(const Socket::HttpRequest &requ)
 	if (requ.method != "GET")
 		throw AbortConnectionException(405);
 	GetPrivateProfileStringA("Server", "DefaultPage", "", buffer, sizeof(buffer), profilePath);
+	puts(buffer);
 	if (!*buffer)
 		throw AbortConnectionException(404);
 	response.header["Location"] = buffer;
@@ -158,7 +183,6 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 	if (std::find(convertedFormats.begin(), convertedFormats.end(), ext) != convertedFormats.end()) {
 		std::stringstream input;
 		std::stringstream body;
-		bool notImplemented = false;
 		auto fileType = gameFileTypes.at(ext);
 
 		input.str(response.body);
@@ -187,6 +211,20 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 	response.returnCode = 200;
 	response.header["Content-Type"] = gameMimeTypes.at(ext);
 	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
+	return response;
+}
+
+Socket::HttpResponse getCharNames(const Socket::HttpRequest &)
+{
+	Socket::HttpResponse response;
+	nlohmann::json json = nlohmann::json::object();
+
+	for (auto id : availableCharacters)
+		json[std::to_string(id)] = SokuLib::getCharName(id);
+	response.body = json.dump();
+	response.header["Cache-Control"] = "private, immutable, max-age=" + std::to_string(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
+	response.header["Content-Type"] = "application/json";
+	response.returnCode = 200;
 	return response;
 }
 
@@ -250,15 +288,6 @@ static void setState(const Socket::HttpRequest &requ)
 				_cache.leftName = chr["name"];
 			if (chr.contains("score"))
 				_cache.leftScore = chr["score"];
-			/*result["left"] = {
-				{"character", cache.left},
-				{"score",     cache.leftScore},
-				{"name",      convertShiftJisToUTF8(cache.leftName.c_str())},
-				{"used",      cache.leftUsed},
-				{"deck",      leftDeck},
-				{"hand",      leftHand},
-				{"stats",     statsToJson(cache.leftStats)}
-			};*/
 		}
 		if (result.contains("right")) {
 			auto &chr = result["right"];
@@ -270,8 +299,12 @@ static void setState(const Socket::HttpRequest &requ)
 		}
 		if (result.contains("round"))
 			_cache.round = result["round"];
-	} catch (nlohmann::detail::exception &) {
-		throw AbortConnectionException(400);
+	} catch (nlohmann::detail::exception &e) {
+		throw AbortConnectionException(400, nlohmann::json{
+			{"error", "JSON error"},
+			{"details", e.what()},
+			{"body", requ.body}
+		}.dump(), "application/json");
 	}
 	broadcastOpcode(STATE_UPDATE, cacheToJson(_cache));
 	_cache.noReset = true;

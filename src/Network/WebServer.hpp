@@ -32,7 +32,7 @@ private:
 	Socket _sock;
 	std::thread _thread;
 	std::vector<std::shared_ptr<WebSocketConnection>> _webSocks;
-	std::map<std::string, std::string> _folders;
+	std::map<std::string, std::pair<std::string, bool>> _folders;
 	std::map<std::string, std::function<Socket::HttpResponse (const Socket::HttpRequest &request)>> _routes;
 
 	void _serverLoop();
@@ -55,7 +55,7 @@ public:
 	void onWebSocketMessage(const std::function<void (WebSocket &sock, const std::string &msg)> &fct);
 	void onWebSocketError(const std::function<void (WebSocket &sock, const std::exception &e)> &fct);
 	void addRoute(const std::string &&route, std::function<Socket::HttpResponse (const Socket::HttpRequest &request)> &&fct);
-	void addStaticFolder(const std::string &&route, const std::string &&path);
+	void addStaticFolder(const std::string &&route, const std::string &&path, bool discoverable);
 	void start(unsigned short port);
 	void stop();
 };

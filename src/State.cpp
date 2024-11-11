@@ -2,32 +2,31 @@
 // Created by PinkySmile on 08/12/2020.
 //
 
+#include "State.hpp"
+#include "Network/Handlers.hpp"
+#include "Utils/InputBox.hpp"
+#include "Utils/ShiftJISDecoder.hpp"
+#include "nlohmann/json.hpp"
 #include <SokuLib.hpp>
 #include <dinput.h>
 #include <iostream>
-#include "Network/Handlers.hpp"
-#include "nlohmann/json.hpp"
-#include "Utils/ShiftJISDecoder.hpp"
-#include "Utils/InputBox.hpp"
-#include "State.hpp"
 
 #define checkKey(key) (GetKeyState(keys[key]) & 0x8000)
 
-bool enabled;
 unsigned short port;
 std::vector<unsigned> keys(TOTAL_NB_OF_KEYS);
 std::unique_ptr<WebServer> webServer;
 struct CachedMatchData _cache;
 bool needReset;
 bool needRefresh;
-int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_Render)();
-int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_Start)();
-int (__thiscall SokuLib::BattleManager::*s_origCBattleManager_KO)();
-int (__thiscall LoadingWatch::*s_origCLoadingWatch_Process)();
-int (__thiscall BattleWatch::*s_origCBattleWatch_Process)();
-int (__thiscall Loading::*s_origCLoading_Process)();
-int (__thiscall Battle::*s_origCBattle_Process)();
-int (__thiscall Title::*s_origCTitle_Process)();
+int (SokuLib::BattleManager::*s_origCBattleManager_Render)();
+int (SokuLib::BattleManager::*s_origCBattleManager_Start)();
+int (SokuLib::BattleManager::*s_origCBattleManager_KO)();
+int (SokuLib::LoadingWatch::*s_origCLoadingWatch_Process)();
+int (SokuLib::BattleWatch::*s_origCBattleWatch_Process)();
+int (SokuLib::Loading::*s_origCLoading_Process)();
+int (SokuLib::Battle::*s_origCBattle_Process)();
+int (SokuLib::Title::*s_origCTitle_Process)();;
 HWND myWindow;
 
 const char *jpTitle = "ôîò√ö±æzôVæÑ ü` Æ┤£WïëâMâjâçâïé╠ôΣé≡Æ╟éª Ver1.10a";
@@ -77,7 +76,7 @@ void checkKeyInputs()
 			threadUsed = true;
 			if (thread.joinable())
 				thread.join();
-			thread = std::thread{[]{
+			thread = std::thread{[] {
 				auto answer = InputBox("Change left player name", "Left name", _cache.leftName);
 
 				if (answer.empty()) {
@@ -90,13 +89,31 @@ void checkKeyInputs()
 			}};
 		}
 	}
+	if (isPressed[KEY_CHANGE_ROUND]) {
+		if (!threadUsed) {
+			threadUsed = true;
+			if (thread.joinable())
+				thread.join();
+			thread = std::thread{[] {
+				auto answer = InputBox("Change round name", "Round name", _cache.round);
+
+				if (answer.empty()) {
+					threadUsed = false;
+					return;
+				}
+				_cache.round = answer;
+				broadcastOpcode(STATE_UPDATE, cacheToJson(_cache));
+				threadUsed = false;
+			}};
+		}
+	}
 	if (isPressed[KEY_CHANGE_R_NAME]) {
 		if (!threadUsed) {
 			threadUsed = true;
 			if (thread.joinable())
 				thread.join();
-			thread = std::thread{[]{
-				auto answer = InputBox("Change right player name", "Right name",  _cache.rightName);
+			thread = std::thread{[] {
+				auto answer = InputBox("Change right player name", "Right name", _cache.rightName);
 
 				if (answer.empty()) {
 					threadUsed = false;
@@ -129,7 +146,8 @@ nlohmann::json statsToJson(const Stats &stats)
 		{"rod",      stats.rod},
 		{"grimoire", stats.grimoire},
 		{"fan",      stats.fan},
-		{"drops",    stats.drops}
+		{"drops",    stats.drops},
+		{"special",  stats.specialValue}
 	};
 	std::map<std::string, unsigned char> skillMap;
 
@@ -160,8 +178,10 @@ void updateCache(bool isMultiplayer)
 			auto &netObj = SokuLib::getNetObject();
 
 			if (_cache.realLeftName != netObj.profile1name || _cache.realRightName != netObj.profile2name) {
-				_cache.leftScore = 0;
-				_cache.rightScore = 0;
+				if (!_cache.recvScores) {
+					_cache.leftScore = 0;
+					_cache.rightScore = 0;
+				}
 				_cache.leftName = netObj.profile1name;
 				_cache.rightName = netObj.profile2name;
 				_cache.realLeftName = netObj.profile1name;
@@ -216,7 +236,7 @@ void updateCache(bool isMultiplayer)
 	}
 	std::sort(_cache.rightCards.begin(), _cache.rightCards.end());
 
-	//Hands
+	// Hands
 	for (int i = 0; i < battleMgr.leftCharacterManager.cardCount; i++) {
 		_cache.leftHand.push_back(leftHand.handCardBase[(i + leftHand.selectedCard) % leftHand.handCardMax]->id);
 		_cache.leftUsed.erase(std::find(_cache.leftUsed.begin(), _cache.leftUsed.end(), _cache.leftHand.back()));
@@ -251,6 +271,12 @@ void updateCache(bool isMultiplayer)
 	newStats.rod =      battleMgr.leftCharacterManager.controlRod;
 	newStats.fan =      battleMgr.leftCharacterManager.tenguFans;
 	newStats.grimoire = battleMgr.leftCharacterManager.grimoires;
+	if (SokuLib::leftChar == SokuLib::CHARACTER_YUYUKO)
+		newStats.specialValue = battleMgr.leftCharacterManager.resurrectionButterfliesUsed;
+	else if (SokuLib::leftChar == SokuLib::CHARACTER_REISEN)
+		newStats.specialValue = battleMgr.leftCharacterManager.elixirUsed;
+	else
+		newStats.specialValue = 0;
 	std::memcpy(newStats.skillMap, battleMgr.leftCharacterManager.skillMap, sizeof(newStats.skillMap));
 	if (memcmp(&newStats, &_cache.leftStats, sizeof(newStats)) != 0) {
 		std::memcpy(&_cache.leftStats, &newStats, sizeof(newStats));
@@ -263,6 +289,12 @@ void updateCache(bool isMultiplayer)
 	newStats.rod =      battleMgr.rightCharacterManager.controlRod;
 	newStats.fan =      battleMgr.rightCharacterManager.tenguFans;
 	newStats.grimoire = battleMgr.rightCharacterManager.grimoires;
+	if (SokuLib::rightChar == SokuLib::CHARACTER_YUYUKO)
+		newStats.specialValue = battleMgr.rightCharacterManager.resurrectionButterfliesUsed;
+	else if (SokuLib::rightChar == SokuLib::CHARACTER_REISEN)
+		newStats.specialValue = battleMgr.rightCharacterManager.elixirUsed;
+	else
+		newStats.specialValue = 0;
 	std::memcpy(newStats.skillMap, battleMgr.rightCharacterManager.skillMap, sizeof(newStats.skillMap));
 	if (memcmp(&newStats, &_cache.rightStats, sizeof(newStats)) != 0) {
 		std::memcpy(&_cache.rightStats, &newStats, sizeof(newStats));
@@ -297,7 +329,12 @@ std::string cacheToJson(CachedMatchData cache)
 		rightHand = cache.rightHand;
 	}
 
+	result["isPlaying"] = SokuLib::sceneId == SokuLib::SCENE_BATTLE ||
+			      SokuLib::sceneId == SokuLib::SCENE_BATTLECL ||
+			      SokuLib::sceneId == SokuLib::SCENE_BATTLESV ||
+			      SokuLib::sceneId == SokuLib::SCENE_BATTLEWATCH;
 	result["left"] = {
+		{ "palette",   SokuLib::leftPlayerInfo.palette },
 		{ "character", cache.left },
 		{ "score",     cache.leftScore },
 		{ "name",      convertShiftJisToUTF8(cache.leftName.c_str()) },
@@ -307,6 +344,7 @@ std::string cacheToJson(CachedMatchData cache)
 		{ "stats",     statsToJson(cache.leftStats) }
 	};
 	result["right"] = {
+		{ "palette",   SokuLib::rightPlayerInfo.palette },
 		{ "character", cache.right },
 		{ "score",     cache.rightScore },
 		{ "name",      convertShiftJisToUTF8(cache.rightName.c_str()) },

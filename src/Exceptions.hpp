@@ -1,9 +1,8 @@
 #ifndef DISCXXORD_EXCEPTION_HPP
 #define DISCXXORD_EXCEPTION_HPP
 
-
-#include <string>
 #include "Network/Socket.hpp"
+#include <string>
 
 //! @brief Define the BaseException. All exceptions must be inherited from here.
 class BaseException : public std::exception {
@@ -13,7 +12,7 @@ private:
 public:
 	//! @brief Constructor of the BaseException
 	//! @param msg Exception message
-	explicit BaseException(const std::string &&msg) : _msg(msg)	{};
+	explicit BaseException(const std::string &&msg) : _msg(msg) {};
 
 	//! @brief what function
 	//! @return char* The message of the exception
@@ -117,20 +116,33 @@ class NotImplementedException : public NetworkException {
 public:
 	//! @brief Create a EOFException with a message.
 	//! @param msg The error message.
-	explicit NotImplementedException() : NetworkException("Not implemented") {};
+	explicit NotImplementedException() : NetworkException("Not implemented"){};
 };
 
 //! @brief Define a EOFException.
 class AbortConnectionException : public NetworkException {
 private:
 	unsigned short _code;
+	std::string _body;
+	std::string _type;
 
 public:
 	//! @brief Create a EOFException with a message.
 	//! @param msg The error message.
-	explicit AbortConnectionException(unsigned short code) : NetworkException(std::to_string(code)), _code(code) {};
+	explicit AbortConnectionException(unsigned short code) : NetworkException(std::to_string(code)), _code(code){};
+	explicit AbortConnectionException(unsigned short code, const std::string &&body, const std::string &&type) : NetworkException(std::to_string(code)), _code(code), _body(body), _type(type){};
 
-	unsigned short getCode() const { return _code; };
+	unsigned short getCode() const {
+		return this->_code;
+	};
+
+	const char *getBody() const {
+		return this->_body.c_str();
+	};
+
+	const char *getType() const {
+		return this->_type.c_str();
+	};
 };
 
 //! @brief Define a InvalidHTTPAnswerException.
@@ -165,8 +177,10 @@ private:
 
 public:
 	//! @param msg The error message.
-	ConnectionTerminatedException(const std::string &&msg, unsigned code) : NetworkException(static_cast<const std::string &&>(msg)), _code(code) {};
-	unsigned getCode() const { return this->_code; };
+	ConnectionTerminatedException(const std::string &&msg, unsigned code) : NetworkException(static_cast<const std::string &&>(msg)), _code(code){};
+	unsigned getCode() const {
+		return this->_code;
+	};
 };
 
 //! @brief Define a HTTPErrorException.
@@ -177,15 +191,14 @@ private:
 public:
 	//! @brief Create a HTTPErrorException with a message.
 	//! @param response The response from a Socket.
-	HTTPErrorException(const Socket::HttpResponse &response) :
-		NetworkException(response.request.host + " responded with code " + std::to_string(response.returnCode) + " " + response.codeName),
-		_response(response)
-	{}
+	HTTPErrorException(const Socket::HttpResponse &response):
+		NetworkException(response.request.host + " responded with code " + std::to_string(response.returnCode) + " " + response.codeName), _response(response) {}
 
 	//! @brief Return the response of the last Socket Exception.
 	//! @return Socket::HttpResponse
-	Socket::HttpResponse getResponse() const { return this->_response; }
+	Socket::HttpResponse getResponse() const {
+		return this->_response;
+	}
 };
 
-
-#endif //DISCXXORD_EXCEPTION_HPP
+#endif // DISCXXORD_EXCEPTION_HPP

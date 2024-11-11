@@ -1,21 +1,31 @@
 /* Character stand alignment file */
 
+/* Reimu */
+img.centeredLeft.chr0 {
+}
+img.centeredRight.chr0 {
+}
+
 /* Marisa */
 img.centeredLeft.chr1 {
     left: -300px;
     bottom: 150px;
 }
-
 img.centeredRight.chr1 {
     left: -900px;
     bottom: 150px;
+}
+
+/* Sakuya */
+img.centeredLeft.chr2 {
+}
+img.centeredRight.chr2 {
 }
 
 /* Alice */
 img.centeredLeft.chr3 {
     bottom: 0;
 }
-
 img.centeredRight.chr3 {
     bottom: 0;
 }
@@ -24,7 +34,6 @@ img.centeredRight.chr3 {
 img.centeredLeft.chr4 {
     left: -425px; /* -375 -> -425 */
 }
-
 img.centeredRight.chr4 {
     left: -775px;
 }
@@ -34,7 +43,6 @@ img.centeredLeft.chr5 {
     left: -425px;
     bottom: 200px;
 }
-
 img.centeredRight.chr5 {
     left: -775px;
     bottom: 200px;
@@ -45,7 +53,6 @@ img.centeredLeft.chr6 {
     left: -375px;
     bottom: 200px;
 }
-
 img.centeredRight.chr6 {
     left: -825px;
     bottom: 200px;
@@ -55,9 +62,14 @@ img.centeredRight.chr6 {
 img.centeredLeft.chr7 {
     left: -375px;
 }
-
 img.centeredRight.chr7 {
     left: -825px;
+}
+
+/* Yukari */
+img.centeredLeft.chr8 {
+}
+img.centeredRight.chr8 {
 }
 
 /* Suika */
@@ -65,7 +77,6 @@ img.centeredLeft.chr9 {
     left: -550px;
     bottom: 400px;
 }
-
 img.centeredRight.chr9 {
     left: -650px;
     bottom: 400px;
@@ -76,7 +87,6 @@ img.centeredLeft.chr10 {
     left: -550px;
     bottom: 200px;
 }
-
 img.centeredRight.chr10 {
     left: -650px;
     bottom: 200px;
@@ -87,7 +97,6 @@ img.centeredLeft.chr11 {
     left: -550px;
     bottom: 500px;
 }
-
 img.centeredRight.chr11 {
     left: -650px;
     bottom: 500px;
@@ -97,7 +106,6 @@ img.centeredRight.chr11 {
 img.centeredLeft.chr12 {
     left: -425px;
 }
-
 img.centeredRight.chr12 {
     left: -775px;
 }
@@ -107,10 +115,21 @@ img.centeredLeft.chr13 {
     left: -475px;
     bottom: 250px;
 }
-
 img.centeredRight.chr13 {
     left: -725px;
     bottom: 250px;
+}
+
+/* Tenshi */
+img.centeredLeft.chr14 {
+}
+img.centeredRight.chr14 {
+}
+
+/* Sanae */
+img.centeredLeft.chr15 {
+}
+img.centeredRight.chr15 {
 }
 
 /* Cirno */
@@ -118,7 +137,6 @@ img.centeredLeft.chr16 {
     left: -350px;
     bottom: 250px;
 }
-
 img.centeredRight.chr16 {
     left: -850px;
     bottom: 250px;
@@ -129,7 +147,6 @@ img.centeredLeft.chr17 {
     left: -425px;
     bottom: 200px;
 }
-
 img.centeredRight.chr17 {
     left: -775px;
     bottom: 200px;
@@ -140,7 +157,6 @@ img.centeredLeft.chr18 {
     left: -425px;
     bottom: 200px;
 }
-
 img.centeredRight.chr18 {
     left: -775px;
     bottom: 200px;
@@ -151,7 +167,6 @@ img.centeredLeft.chr19 {
     left: -425px;
     bottom: 200px;
 }
-
 img.centeredRight.chr19 {
     left: -775px;
     bottom: 200px;
@@ -162,7 +177,6 @@ img.centeredLeft.chr22 {
     left: -375px;
     bottom: 350px;
 }
-
 img.centeredRight.chr22 {
     left: -825px;
     bottom: 350px;
@@ -173,7 +187,6 @@ img.centeredLeft.chr23 {
     left: -425px;
     bottom: 150px;
 }
-
 img.centeredRight.chr23 {
     left: -775px;
     bottom: 150px;
@@ -184,7 +197,6 @@ img.centeredLeft.chr24 {
     left: -350px;
     bottom: 400px;
 }
-
 img.centeredRight.chr24 {
     left: -850px;
     bottom: 400px;
@@ -195,7 +207,6 @@ img.centeredLeft.chr25 {
     left: -475px;
     bottom: 200px;
 }
-
 img.centeredRight.chr25 {
     left: -725px;
     bottom: 200px;
@@ -206,7 +217,6 @@ img.centeredLeft.chr26 {
     left: -475px;
     bottom: 300px;
 }
-
 img.centeredRight.chr26 {
     left: -725px;
     bottom: 300px;
@@ -217,7 +227,6 @@ img.centeredLeft.chr27 {
     left: -300px;
     bottom: 0;
 }
-
 img.centeredRight.chr27 {
     left: -900px;
     bottom: 0;
@@ -227,7 +236,6 @@ img.centeredRight.chr27 {
 img.centeredLeft.chr28 {
     bottom: 250px;
 }
-
 img.centeredRight.chr28 {
     bottom: 250px;
 }
@@ -236,7 +244,6 @@ img.centeredRight.chr28 {
 img.centeredLeft.chr29 {
     left: -425px;
 }
-
 img.centeredRight.chr29 {
     left: -775px;
 }
@@ -245,7 +252,6 @@ img.centeredRight.chr29 {
 img.centeredLeft.chr30 {
     left: -475px;
 }
-
 img.centeredRight.chr30 {
     left: -725px;
 }
@@ -254,7 +260,6 @@ img.centeredRight.chr30 {
 img.centeredLeft.chr31 {
     left: -375px;
 }
-
 img.centeredRight.chr31 {
     left: -825px;
 }
@@ -263,7 +268,6 @@ img.centeredRight.chr31 {
 img.centeredLeft.chr32 {
     left: -425px;
 }
-
 img.centeredRight.chr32 {
     left: -775px;
 }
@@ -272,7 +276,6 @@ img.centeredRight.chr32 {
 img.centeredLeft.chr33 {
     left: -475px;
 }
-
 img.centeredRight.chr33 {
     left: -725px;
 }
@@ -281,7 +284,6 @@ img.centeredRight.chr33 {
 img.centeredLeft.chr34 {
     left: -425px;
 }
-
 img.centeredRight.chr34 {
     left: -775px;
 }
@@ -291,7 +293,6 @@ img.centeredLeft.chr35 {
     left: -325px;
     bottom: 0;
 }
-
 img.centeredRight.chr35 {
     left: -875px;
     bottom: 0;
@@ -302,7 +303,6 @@ img.centeredLeft {
     left: -400px;
     bottom: 100px;
 }
-
 img.centeredRight {
     left: -800px;
     bottom: 100px;
