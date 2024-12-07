@@ -177,7 +177,6 @@ void WebServer::_serverLoop()
 					return std::regex_match(requ.realPath, std::regex{pair.first});
 				});
 
-				std::cout << requ.realPath << std::endl;
 				response.request = requ;
 				if (it != this->_routes.end())
 					response = it->second(requ);

@@ -152,6 +152,10 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 {
 	if (requ.realPath == "/internal")
 		throw AbortConnectionException(501);
+	if (requ.method != "GET")
+		throw AbortConnectionException(405);
+	if (requ.realPath.back() == '/')
+		throw AbortConnectionException(501);
 
 	auto path = requ.realPath.substr(strlen("/internal/"));
 	auto pos = path.find_last_of('.');
@@ -214,8 +218,11 @@ Socket::HttpResponse loadInternalAsset(const Socket::HttpRequest &requ)
 	return response;
 }
 
-Socket::HttpResponse getCharNames(const Socket::HttpRequest &)
+Socket::HttpResponse getCharNames(const Socket::HttpRequest &requ)
 {
+	if (requ.method != "GET")
+		throw AbortConnectionException(405);
+
 	Socket::HttpResponse response;
 	nlohmann::json json = nlohmann::json::object();
 
@@ -230,6 +237,9 @@ Socket::HttpResponse getCharNames(const Socket::HttpRequest &)
 
 Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
 {
+	if (requ.method != "GET")
+		throw AbortConnectionException(405);
+
 	auto id = std::stoul(requ.realPath.substr(strlen("/charName/")));
 
 	if (std::find(availableCharacters.begin(), availableCharacters.end(), id) == availableCharacters.end())
@@ -247,6 +257,9 @@ Socket::HttpResponse getCharName(const Socket::HttpRequest &requ)
 
 Socket::HttpResponse loadSkillSheet(const Socket::HttpRequest &requ)
 {
+	if (requ.method != "GET")
+		throw AbortConnectionException(405);
+
 	auto id = std::stoul(requ.realPath.substr(strlen("/skillSheet/")));
 
 	if (std::find(availableCharacters.begin(), availableCharacters.end(), id) == availableCharacters.end())

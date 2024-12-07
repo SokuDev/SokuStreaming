@@ -246,7 +246,7 @@ void LoadSettings() {
 	webServer = std::make_unique<WebServer>(GetPrivateProfileIntA("Server", "Cache", 0, profilePath));
 	webServer->addRoute("^/$", root);
 	webServer->addRoute("^/state$", state);
-	webServer->addRoute("^/connectRoute$", connectRoute);
+	webServer->addRoute("^/connect$", connectRoute);
 	webServer->addRoute("^/characters$", getCharNames);
 	webServer->addRoute("^/charName/\\d+$", getCharName);
 	webServer->addRoute("^/internal(/.*)?$", loadInternalAsset);
@@ -290,7 +290,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 		hookFunctions();
 	} catch (std::exception &e) {
 		MessageBoxA(nullptr, e.what(), "Cannot init SokuStreaming", MB_OK | MB_ICONERROR);
-		abort();
+		return false;
 	} catch (...) {
 		MessageBoxA(nullptr, "Wtf ?", "Huh... ok", MB_OK | MB_ICONERROR);
 		abort();
