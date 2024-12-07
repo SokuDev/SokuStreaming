@@ -1,5 +1,5 @@
 # SokuStreaming
-Streaming tool for Touhou 12.3: Hisoutensoku. SokuStreaming provides an easy to use API to
+Streaming tool for Touhou 12.3: Hisoutensoku. SokuStreaming provides an easy-to-use API to
 fetch information from the game and connect to games.
 
 # Build
